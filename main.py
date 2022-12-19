@@ -41,7 +41,10 @@ req_params = {
     'format'    : 'json'
 }
 response = SESSION.post(API, data=req_params).json()
-print(bcolors.OKGREEN+response['login']['result']+bcolors.ENDC)
+if response['login']['result'] == 'Success':
+    print(bcolors.OKGREEN+'Success'+bcolors.ENDC)
+else:
+    print(bcolors.FAIL+response['login']['result']+bcolors.ENDC)
 assert response['login']['result'] == 'Success'
 
 req_params = {
@@ -86,5 +89,8 @@ req_params = {
 }
 print(f'Editing page "{test_page}"...', end='')
 response = SESSION.post(API, data=req_params).json()
-print(bcolors.OKGREEN+response['edit']['result']+bcolors.ENDC)
+if response['edit']['result'] == 'Success':
+    print(bcolors.OKGREEN+'Success'+bcolors.ENDC)
+else:
+    print(bcolors.FAIL+response['edit']['result']+bcolors.ENDC)
 assert response['edit']['result'] == 'Success'
