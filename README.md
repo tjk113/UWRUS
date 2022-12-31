@@ -1,6 +1,6 @@
 # Ukikipedia World Record Update Script (UWRUS)
 
-Automatically pulls new X-Cam and Single Star world records from the (discord/spreadsheets) and updates it on the star's RTA Guide page
+Automatically pulls new X-Cam and Single Star world records from their spreadsheets and updates it on the star's RTA Guide page
 
 ## Current functionality:
 Can update single star records
