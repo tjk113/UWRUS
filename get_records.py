@@ -1,4 +1,5 @@
 import os.path
+import json
 import re
 
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -12,12 +13,12 @@ from ast import literal_eval
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 
 TEST_SS_SHEET = '1mVSI74yhPZqOHm-2U-GkNeg1Dwck8tcdsmN_-niQeeI' # test sheet
-TEST_SS_SHEET_2 = '1OOqBAHO6HDvB2BIz5ljHNZgnqey7w_eg71z1jifNplE' # test sheet w/ "new" wrs
-# SS_SHEET = '1_cOIEnuKIQ-3LA_U0ygpiL87PTSBPlHmKDId0vC7alo'
+TEST_SS_SHEET_2 = '1cZbATGoMW_T-TQtLDZVNlbLiRcejiAizhA8ApkyTw4E' # test sheet w/ "new" wrs
+SS_SHEET = '1_cOIEnuKIQ-3LA_U0ygpiL87PTSBPlHmKDId0vC7alo'
 SS_RANGE = 'Singlestar!B:E'
 
-RTA_SHEET = '1MLCoRkzXvQwPCnJsQL6NJRfkIStPnYjjiRPPX5vu8is'
-RTA_RANGE = 'Ultimate Star Spreadsheet v2!A:B'
+RTA_SHEET = '1J20aivGnvLlAuyRIMMclIFUmrkHXUzgcDmYa31gdtCI'
+RTA_RANGE = ['Ultimate Star Spreadsheet v2!A:B']
 
 record_parse = re.compile(r'=HYPERLINK\("(?P<link>.+)?";"(?P<time>.+)"\)')
 
@@ -41,7 +42,7 @@ def get_creds() -> Credentials:
             token.write(creds.to_json())
     return creds
 
-def remove_mins_place(record: str):
+def remove_mins_place(record: str) -> float:
     '''
     Converts records longer than 1 minute 
     from a X:XX.XX format to a XX.XX format
@@ -54,11 +55,11 @@ def remove_mins_place(record: str):
     # to the existing seconds place
     return record_list[0]*60 + record_list[1]
 
-def parse_values(values: list[str]) -> list[tuple[str, str, str]]:
+def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
     '''
-    Parses raw spreadsheet values, formats each star's
-    information (time, link, name) into tuples, and returns
-    a list containing said tuples
+    Parses raw single star spreadsheet values, formats each
+    star's information (time, link, name) into tuples, and
+    returns a list containing said tuples
     '''
     records = []
     IGT_TEXT = ''
@@ -130,12 +131,13 @@ def get_ss_records(creds: Credentials) -> tuple[str, str, str]:
     try:
         service = build('sheets', 'v4', credentials=creds)
         sheet = service.spreadsheets()
-        result = sheet.values().get(spreadsheetId=TEST_SS_SHEET_2,
+        result = sheet.values().get(spreadsheetId=SS_SHEET,
                  range=SS_RANGE, valueRenderOption='FORMULA').execute()
         values = result.get('values', [])
+        print(values)
 
         if not values:
-            print('No data found in sheet #2.')
+            print('No data found in sheet')
             return
 
         # Read locally stored records
@@ -144,73 +146,111 @@ def get_ss_records(creds: Credentials) -> tuple[str, str, str]:
             for line in file:
                 local_records.append(literal_eval(line.strip('\n')))
         # Parse records pulled from spreadsheet
-        cur_records = parse_values(values)
+        cur_records = parse_ss_values(values)
 
         # Write current records to local file
-        with open('last_saved_ss.txt', 'w+') as file:
-            for record in cur_records:
-                file.write(str(record)+'\n')
+        # with open('last_saved_ss.txt', 'w+') as file:
+        #     for record in cur_records:
+        #         file.write(str(record)+'\n')
 
     except HttpError as err:
         print(err)
 
-    # Remove everything from records except the new wrs
-    for record, record_2 in zip(local_records, cur_records):
-        temp_time = record[0]
-        temp_time_2 = record_2[0]
+    # Remove everything from local_records except the new wrs
+    # (Iterate over copies of lists so that we can delete items
+    # from the actual lists while iterating)
+    for local_record, cur_record in zip(local_records[:], cur_records[:]):
+        temp_time = local_record[0]
+        temp_time_2 = cur_record[0]
 
-        if 'IGT' in record[0]:
-            temp_time = record[0][:-6]
-        if 'IGT' in record_2[0]:
-            temp_time_2 = record_2[0][:-6]
+        if 'IGT' in local_record[0]:
+            temp_time = local_record[0][:-6]
+        if 'IGT' in cur_record[0]:
+            temp_time_2 = cur_record[0][:-6]
 
-        if ":" in record[0]:
+        if ":" in local_record[0]:
             temp_time = remove_mins_place(temp_time)
-        if ":" in record_2[0]:
+        if ":" in cur_record[0]:
             temp_time_2 = remove_mins_place(temp_time_2)
 
-        if record == record_2:
-            del record
-            del record_2
+        if local_record == cur_record:
+            local_records.remove(local_record)
+            cur_records.remove(cur_record)
         # If the new wr is faster or if there's a
         # new video link, then update the record
-        elif float(temp_time) > float(temp_time_2) or str(temp_time)[1] != str(temp_time_2)[1]:
-            records = record_2
-    return records
+        elif float(temp_time) > float(temp_time_2) or \
+             str(temp_time)[1] != str(temp_time_2)[1]:
+                 local_record = cur_record
+    return local_records
 
-def get_rta_records(creds: Credentials) -> tuple[str, str, str]:
+def parse_rta_values(values: dict) -> tuple[str, str, str]:
+    '''
+    Parses raw RTA spreadsheet values, formats each
+    star's information (time, link, name) into tuples, and
+    returns a list containing said tuples
+    '''
+    pass
+
+def get_rta_records(creds: Credentials = None) -> tuple[str, str, str]:
     '''
     Gets new RTA WRs from spreadsheet and creates
     a list of tuples that hold the new times, links, and
     row labels
     '''
     try:
-        service = build('sheets', 'v4', credentials=creds)
-        # Call the Sheets API
-        sheet = service.spreadsheets()
-        result = sheet.values().get(spreadsheetId=RTA_SHEET,
-                 range=RTA_RANGE, valueRenderOption='UNFORMATTED_VALUE').execute()
-        # result_2 = sheet.values().get(spreadsheetId=SS_SHEET_2,
-        #          range=RTA_RANGE, valueRenderOption='FORMULA').execute()
-        values = result.get('values', [])
-        # values_2 = result_2.get('values', [])
+        # service = build('sheets', 'v4', credentials=creds)
+        # sheet = service.spreadsheets()
+        # result = sheet.get(spreadsheetId=RTA_SHEET,
+        #          ranges=RTA_RANGE,
+        #          fields='sheets/data/rowData/values(hyperlink,effectiveValue/stringValue)').execute()
+        # print(type(result))
+        values = {}
+        records = []
+        with open('j.json', 'r') as file:
+            values = json.load(file)
+            
+        # They really love alternating between dicts and lists :|
+        for i in values['sheets'][0]['data'][0]['rowData']:
+            # If there is a time in the row...
+            if i and len(i['values']) > 1:
+                # And a link...
+                if len(i['values'][1]) > 1:
+                    # Then append a (time, link, row label) tuple to records
+                    records.append((i['values'][1]['effectiveValue']['stringValue'],
+                                    i['values'][1]['hyperlink'],
+                                    i['values'][0]['effectiveValue']['stringValue']))
 
-        if not values:
-            print('No data found in sheet #1.')
-            return
-        # if not values_2:
-        #     print('No data found in sheet #2.')
+        # Can check for indentation and/or a [bracked number] > 1 to find out
+        # if we should still be checking for a faster time for the current star
+
+        # with open('j.json', 'w+') as file:
+        #     file.write(json.dumps(result, indent=2))
+        # values = result.get('values', [])
+        # print(values)
+
+        # if not values:
+        #     print('No data found in sheet')
         #     return
 
-        # records = parse_values(values)
-        # records_2 = parse_values(values_2)
+        # Read locally stored records
+        # local_records = []
+        # with open('last_saved_rta.txt', 'r') as file:
+        #     for line in file:
+        #         local_records.append(literal_eval(line.strip('\n')))
+        # # Parse records pulled from spreadsheet
+        # cur_records = parse_values(values)
 
-        print(values)
+        # Write current records to local file
+        # with open('last_saved_ss.txt', 'w+') as file:
+        #     for record in cur_records:
+        #         file.write(str(record)+'\n')
+        # return cur_records
 
     except HttpError as err:
         print(err)
 
 # Test Driver Code
 if __name__ == '__main__':
-    CREDS = get_creds()
-    get_ss_records(CREDS)
+    # CREDS = get_creds()
+    # print(get_ss_records(CREDS))
+    print(get_rta_records())
