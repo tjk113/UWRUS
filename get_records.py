@@ -22,6 +22,12 @@ RTA_RANGE = ['Ultimate Star Spreadsheet v2!A:B']
 
 record_parse = re.compile(r'=HYPERLINK\("(?P<link>.+)?";"(?P<time>.+)"\)')
 
+# Note: it'd be nice to use named tuples, but given that literal_eval
+# can't parse user-defined types, the extra code required to make them
+# work with the local record files isn't worth the effort, especially 
+# considering the relatively small section of code that could actually
+# be rewritten with them.
+
 def get_creds() -> Credentials:
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
@@ -55,6 +61,40 @@ def remove_mins_place(record: str) -> float:
     # to the existing seconds place
     return record_list[0]*60 + record_list[1]
 
+def get_new_records(local_records: list[tuple[str, str, str]], \
+                    cur_records:   list[tuple[str, str, str]]) \
+                    -> list[tuple[str, str, str]]:
+    '''
+    Return only the new records as compared
+    to the current local records list
+    '''
+    # Remove everything from local_records except the new records
+    # (Iterate over copies of lists so that we can delete items
+    # from the actual lists while iterating)
+    for local_record, cur_record in zip(local_records[:], cur_records[:]):
+        temp_time = local_record[0]
+        temp_time_2 = cur_record[0]
+
+        if 'IGT' in local_record[0]:
+            temp_time = local_record[0][:-6]
+        if 'IGT' in cur_record[0]:
+            temp_time_2 = cur_record[0][:-6]
+
+        if ":" in local_record[0]:
+            temp_time = remove_mins_place(temp_time)
+        if ":" in cur_record[0]:
+            temp_time_2 = remove_mins_place(temp_time_2)
+
+        if local_record == cur_record:
+            local_records.remove(local_record)
+            cur_records.remove(cur_record)
+        # If the new wr is faster or if there's a
+        # new video link, then update the record
+        elif float(temp_time) > float(temp_time_2) or \
+             str(temp_time)[1] != str(temp_time_2)[1]:
+                 local_record = cur_record
+    return local_records
+
 def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
     '''
     Parses raw single star spreadsheet values, formats each
@@ -86,8 +126,14 @@ def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
                 # Prioritize first real-time record if there are
                 # tied IGT record(s) or tied real-time record(s)
                 cur_igt = values[i][3].replace('"', '.').replace("'", ':')
-                next_igt = record_parse.search(values[i+1][3]).group('time') \
-                           .replace('""', '.').replace("'", ':')
+                # Pretty much just to handle Snowman's Lost His Head
+                # (and maybe In the Deep Freeze)
+                try:
+                    next_igt = record_parse.search(values[i+1][3]).group('time') \
+                            .replace('""', '.').replace("'", ':')
+                except AttributeError:
+                    next_igt = values[i+1][3].replace('"', '.').replace("'", ':')
+
                 if ':' in cur_igt:
                     cur_igt = remove_mins_place(cur_igt)
                 if ':' in next_igt:
@@ -122,7 +168,7 @@ def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
             pass
     return records
 
-def get_ss_records(creds: Credentials) -> tuple[str, str, str]:
+def get_ss_records(creds: Credentials) -> list[tuple[str, str, str]]:
     '''
     Gets new Single Star WRs from spreadsheet and creates
     a list of tuples that hold the new times, links, and
@@ -134,7 +180,6 @@ def get_ss_records(creds: Credentials) -> tuple[str, str, str]:
         result = sheet.values().get(spreadsheetId=SS_SHEET,
                  range=SS_RANGE, valueRenderOption='FORMULA').execute()
         values = result.get('values', [])
-        print(values)
 
         if not values:
             print('No data found in sheet')
@@ -156,42 +201,46 @@ def get_ss_records(creds: Credentials) -> tuple[str, str, str]:
     except HttpError as err:
         print(err)
 
-    # Remove everything from local_records except the new wrs
-    # (Iterate over copies of lists so that we can delete items
-    # from the actual lists while iterating)
-    for local_record, cur_record in zip(local_records[:], cur_records[:]):
-        temp_time = local_record[0]
-        temp_time_2 = cur_record[0]
+    new_records = get_new_records(local_records, cur_records)
+    return new_records
 
-        if 'IGT' in local_record[0]:
-            temp_time = local_record[0][:-6]
-        if 'IGT' in cur_record[0]:
-            temp_time_2 = cur_record[0][:-6]
-
-        if ":" in local_record[0]:
-            temp_time = remove_mins_place(temp_time)
-        if ":" in cur_record[0]:
-            temp_time_2 = remove_mins_place(temp_time_2)
-
-        if local_record == cur_record:
-            local_records.remove(local_record)
-            cur_records.remove(cur_record)
-        # If the new wr is faster or if there's a
-        # new video link, then update the record
-        elif float(temp_time) > float(temp_time_2) or \
-             str(temp_time)[1] != str(temp_time_2)[1]:
-                 local_record = cur_record
-    return local_records
-
-def parse_rta_values(values: dict) -> tuple[str, str, str]:
+def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
     '''
     Parses raw RTA spreadsheet values, formats each
     star's information (time, link, name) into tuples, and
     returns a list containing said tuples
     '''
-    pass
+    records = []
+    # They really love alternating between dicts and lists :|
+    for i in values['sheets'][0]['data'][0]['rowData']:
+        # If there is a time in the row...
+        if i and len(i['values']) > 1:
+            # And a link...
+            if len(i['values'][1]) > 1:
+                # Then append a (time, link, row label) tuple to records
+                records.append((i['values'][1]['effectiveValue']['stringValue'],
+                                i['values'][1]['hyperlink'],
+                                i['values'][0]['effectiveValue']['stringValue']))
+        # Don't track castle movement rows
+        elif i and i['values'][0]['effectiveValue']['stringValue'] == '17. Castle (Lobby)':
+            break
 
-def get_rta_records(creds: Credentials = None) -> tuple[str, str, str]:
+    cur_star_name = ''
+    for record in records:
+        if '[1]' in record[2]:
+            if 'RTA' in record[2]:
+                continue
+            cur_star_name = record[2][4:]
+            if 'JP' in cur_star_name or 'US' in cur_star_name:
+                cur_star_name = cur_star_name[:-5]
+            print(cur_star_name)
+        elif '[1]' in cur_star_name:
+            continue
+
+        # print(record)
+    return records
+
+def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     '''
     Gets new RTA WRs from spreadsheet and creates
     a list of tuples that hold the new times, links, and
@@ -204,21 +253,11 @@ def get_rta_records(creds: Credentials = None) -> tuple[str, str, str]:
         #          ranges=RTA_RANGE,
         #          fields='sheets/data/rowData/values(hyperlink,effectiveValue/stringValue)').execute()
         # print(type(result))
-        values = {}
-        records = []
+        local_records = {}
         with open('j.json', 'r') as file:
-            values = json.load(file)
-            
-        # They really love alternating between dicts and lists :|
-        for i in values['sheets'][0]['data'][0]['rowData']:
-            # If there is a time in the row...
-            if i and len(i['values']) > 1:
-                # And a link...
-                if len(i['values'][1]) > 1:
-                    # Then append a (time, link, row label) tuple to records
-                    records.append((i['values'][1]['effectiveValue']['stringValue'],
-                                    i['values'][1]['hyperlink'],
-                                    i['values'][0]['effectiveValue']['stringValue']))
+            local_records = json.load(file)
+        cur_records = parse_rta_values(local_records)
+        # print(records)
 
         # Can check for indentation and/or a [bracked number] > 1 to find out
         # if we should still be checking for a faster time for the current star
@@ -244,7 +283,7 @@ def get_rta_records(creds: Credentials = None) -> tuple[str, str, str]:
         # with open('last_saved_ss.txt', 'w+') as file:
         #     for record in cur_records:
         #         file.write(str(record)+'\n')
-        # return cur_records
+        return cur_records
 
     except HttpError as err:
         print(err)
@@ -253,4 +292,4 @@ def get_rta_records(creds: Credentials = None) -> tuple[str, str, str]:
 if __name__ == '__main__':
     # CREDS = get_creds()
     # print(get_ss_records(CREDS))
-    print(get_rta_records())
+    get_rta_records()

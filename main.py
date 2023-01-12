@@ -1,8 +1,8 @@
 import requests
 import json
 
+from get_records import get_ss_records, get_creds
 from replace_record import replace_record
-from get_records import get_ss_records
 
 class bcolors:
     '''Used for output coloring'''
@@ -18,9 +18,10 @@ class bcolors:
 
 BOT_USER = ''
 BOT_PASS = ''
-test_page = 'User:Tjk113'
-test_new_wr = ('0.00', 'https://www.youtube.com/watch?v=9yjZpBq1XBE')
-new_ss_records = get_ss_records()
+SHEETS_CREDS = get_creds()
+# test_page = 'User:Tjk113'
+# test_new_wr = ('0.00', 'https://www.youtube.com/watch?v=9yjZpBq1XBE')
+new_ss_records = get_ss_records(SHEETS_CREDS)
 
 API = 'https://ukikipedia.net/mediawiki/api.php'
 SESSION = requests.Session()
@@ -48,19 +49,6 @@ else:
     print(bcolors.FAIL+response['login']['result']+bcolors.ENDC)
 assert response['login']['result'] == 'Success'
 
-# req_params = {
-#     'action'       : 'query',
-#     'prop'         : 'revisions',
-#     'titles'       : test_page,
-#     'rvslots'      : 'main',
-#     'rvprop'       : 'content',
-#     'formatversion': 2,
-#     'format'       : 'json'
-# }
-# response = json.loads(requests.get(API, params=req_params).text)['query']['pages'][0] \
-#                       ['revisions'][0]['slots']['main']['content']
-# assert '{{speedrun_infobox' in response
-
 for record in new_ss_records:
     req_params = {
         'action'       : 'query',
@@ -82,7 +70,7 @@ for record in new_ss_records:
     START_TIMESTAMP = response['curtimestamp']
     CSRF_TOKEN = response['query']['tokens']['csrftoken']
 
-    page_text, summary = replace_record(page_text, new_ss_record=test_new_wr)
+    page_text, summary = replace_record(page_text, new_ss_record=record)
 
     req_params = {
         'action'        : 'edit',
