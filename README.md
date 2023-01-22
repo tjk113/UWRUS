@@ -8,3 +8,4 @@ Can update single star records
 ## // TODO:
 - Figure out how exactly we're getting WR updates. On what schedule will the script run?
 - For X-Cam records, make sure that we're pulling the record for the fastest RTA strat (unless otherwise specified)
+- Generally figure out how to deal with 100c and bowser stage pages 

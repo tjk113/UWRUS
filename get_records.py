@@ -213,31 +213,61 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
     records = []
     # They really love alternating between dicts and lists :|
     for i in values['sheets'][0]['data'][0]['rowData']:
+        # if i:
+        #     print(i['values'][0])
         # If there is a time in the row...
         if i and len(i['values']) > 1:
             # And a link...
-            if len(i['values'][1]) > 1:
-                # Then append a (time, link, row label) tuple to records
-                records.append((i['values'][1]['effectiveValue']['stringValue'],
-                                i['values'][1]['hyperlink'],
-                                i['values'][0]['effectiveValue']['stringValue']))
-        # Don't track castle movement rows
-        elif i and i['values'][0]['effectiveValue']['stringValue'] == '17. Castle (Lobby)':
-            break
+            if 'hyperlink' in i['values'][1]:
+                # And is bold...
 
-    cur_star_name = ''
-    for record in records:
-        if '[1]' in record[2]:
-            if 'RTA' in record[2]:
-                continue
-            cur_star_name = record[2][4:]
-            if 'JP' in cur_star_name or 'US' in cur_star_name:
-                cur_star_name = cur_star_name[:-5]
-            print(cur_star_name)
-        elif '[1]' in cur_star_name:
+                # TODO: find the fastest strat time and use that
+                if 'userEnteredFormat' in i['values'][0]:
+                    # Then append a (time, link, row label) tuple to records
+                    # TODO: not gonna wanna append the first one we find...
+                    records.append((i['values'][1]['effectiveValue']['stringValue'],
+                                    i['values'][1]['hyperlink'],
+                                    i['values'][0]['effectiveValue']['stringValue']))
+                else:
+                    time = i['values'][1]['effectiveValue']['stringValue']
+                    # if ":" in time:
+                    #     temp_time = remove_mins_place(temp_time)
+                    # if ":" in time:
+                    #     temp_time_2 = remove_mins_place(temp_time_2)
+
+                    # if local_record == cur_record:
+                    #     local_records.remove(local_record)
+                    #     cur_records.remove(cur_record)
+                    # # If the new wr is faster or if there's a
+                    # # new video link, then update the record
+                    # elif float(temp_time) > float(temp_time_2) or \
+                    #     str(temp_time)[1] != str(temp_time_2)[1]:
+                    #         local_record = cur_record
+        # Don't track castle movement rows (idk why the logic has to be weird like this)
+        elif i and 'effectiveValue' in i['values'][0]:
+            if i['values'][0]['effectiveValue']['stringValue'] == '17. Castle (Lobby)':
+                break
+
+    # Iterate over copy of records so we can remove some
+    for record in records[:]:
+        # Remove Stage RTA records
+        if 'RTA' in record[2]:
+            records.remove(record)
             continue
+        # Remove the [1] from the star name
+        cur_star_name = record[2][4:]
+        if 'JP' in cur_star_name or 'US' in cur_star_name:
+            # Special case handling... (is there a better way?)
+            # BitS Battle
+            if cur_star_name[:11] == 'BitS Battle':
+                cur_star_name = cur_star_name[:-20]
+            else:
+                cur_star_name = cur_star_name[:-5]
+        record[2] = cur_star_name
+        # print(cur_star_name, end=', ')
 
-        # print(record)
+    for i in records:
+        print(i)
     return records
 
 def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
@@ -251,10 +281,10 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         # sheet = service.spreadsheets()
         # result = sheet.get(spreadsheetId=RTA_SHEET,
         #          ranges=RTA_RANGE,
-        #          fields='sheets/data/rowData/values(hyperlink,effectiveValue/stringValue)').execute()
+        #          fields='sheets/data/rowData/values(userEnteredFormat/textFormat/bold,hyperlink,effectiveValue/stringValue)').execute() # monstrosity
         # print(type(result))
         local_records = {}
-        with open('j.json', 'r') as file:
+        with open('j2.json', 'r') as file:
             local_records = json.load(file)
         cur_records = parse_rta_values(local_records)
         # print(records)
@@ -262,7 +292,7 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         # Can check for indentation and/or a [bracked number] > 1 to find out
         # if we should still be checking for a faster time for the current star
 
-        # with open('j.json', 'w+') as file:
+        # with open('j2.json', 'w+') as file:
         #     file.write(json.dumps(result, indent=2))
         # values = result.get('values', [])
         # print(values)
