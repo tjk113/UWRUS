@@ -1,16 +1,21 @@
 import re
 
+from get_records import remove_mins_place
+
 def replace_record(cur_page_text: str, new_rta_record: tuple[str, str] = None, \
                    new_ss_record: tuple[str, str] = None) -> tuple[str, str]:
     '''
-    Replaces specified WRs in page text (specify record params in call),
+    Replaces specified records in page text (specify record params in call),
     and returns the new page text and edit summary
     '''
-    # TODO: handle bowser stage infoboxes
+    # TODO: handle bowser stage infoboxes and 100c pages
+    # Updating multiple wrs in one category at once (multiple
+    # rta or ss records in the records list), i'll probably
+    # just make two separate edits (we'll see tho)
 
     records_pattern = re.compile(r'rta_record=(?P<rta_record>.+)\n'
                                  +'\|ss_record=(?P<ss_record>.+)\n')
-    no_vid_record_pattern = re.compile(r'\d\.\d\d ')
+    record_time_pattern = re.compile(r'\d+\.\d+')
     parsed_records = records_pattern.search(cur_page_text)
     edit_summary = "Updated WR(s) '"
 
@@ -21,6 +26,28 @@ def replace_record(cur_page_text: str, new_rta_record: tuple[str, str] = None, \
     if new_ss_record:
         cur_records.append(parsed_records.group('ss_record'))
     parsed_records = parsed_records.group() # we only need this as a string now
+
+    # If somehow replace_record is called for a page
+    # that is already updated (or has a faster time due
+    # to me ignoring the extensions sheet for now),
+    # don't bother updating it again.
+    parsed_record_times = record_time_pattern.findall(parsed_records)
+    for new_record, cur_record_time in zip(new_records, parsed_record_times):
+        new_record_time = new_record[0]
+        if new_record_time == cur_record_time:
+            return
+        if ':' in new_record_time:
+            new_record_time = remove_mins_place(new_record_time)
+        if 'IGT' in new_record_time:
+            new_record_time = new_record_time[:-6]
+        new_record_time = float(new_record_time)
+        if ':' in cur_record_time:
+            cur_record_time = remove_mins_place(cur_record_time)
+        if 'IGT' in cur_record_time:
+            cur_record_time = cur_record_time[:-6]
+        cur_record_time = float(cur_record_time)
+        if new_record_time > cur_record_time:
+            return
 
     # Replace provided record tuples with properly formatted
     # strings, and update those records in the page text
@@ -33,7 +60,8 @@ def replace_record(cur_page_text: str, new_rta_record: tuple[str, str] = None, \
         # by row for the matching video link, and then use
         # that cell's time in place of new_record[0] in the
         # time comparison below
-        cur_record_time  = no_vid_record_pattern.match(cur_record).group()
+        cur_record_time = record_time_pattern.search(cur_record).group()
+        new_record_time = new_record[0]
         if 'Best Available Video' in cur_record:
             # If the best time currently has no video
             # and video and this new entry still isn't
@@ -44,13 +72,14 @@ def replace_record(cur_page_text: str, new_rta_record: tuple[str, str] = None, \
                 new_record = f'[{new_record[1]} {new_record[0]}]'
         else:
             new_record = f'[{new_record[1]} {new_record[0]}]'
-        edit_summary += cur_record_time + "' to '" + new_record
+        edit_summary += cur_record_time + "' to '" + new_record_time + "', '"
         # Update parsed_records with the newly added record, so the next
         # iteration will be looking for the correct string in the page text,
         # and update the page text with the new parsed_records
         new_parsed_records = parsed_records.replace(cur_record, new_record)
         new_page_text = new_page_text.replace(parsed_records, new_parsed_records)
         parsed_records = new_parsed_records
+    edit_summary = edit_summary[:-3] # remove final hanging ", '"
 
     return new_page_text, edit_summary
 
@@ -61,8 +90,8 @@ if __name__ == '__main__':
         for line in file:
             page_text += line
 
-    new_rta_wr = ('0.00', 'https://www.youtube.com/watch?v=W72cyc5sESo')
-    new_ss_wr = ('0.00', 'https://www.youtube.com/watch?v=W72cyc5sESo')
+    new_rta_wr = ('17.40', 'https://www.youtube.com/watch?v=W72cyc5sESo')
+    new_ss_wr = ('8.20', 'https://www.youtube.com/watch?v=GznIqiD5bX8')
 
-    new_text = replace_record(page_text, new_ss_record=new_ss_wr)
-    print(new_text)
+    new_text, edit_summary = replace_record(page_text, new_rta_record=new_rta_wr, new_ss_record=new_ss_wr)
+    print(edit_summary)
