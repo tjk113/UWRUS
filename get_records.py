@@ -38,6 +38,7 @@ def get_creds() -> Credentials:
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
+        print('Updating Google Sheets API credentials...', end='')
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
@@ -131,7 +132,7 @@ def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
                 # (and maybe In the Deep Freeze)
                 try:
                     next_igt = record_parse.search(values[i+1][3]).group('time') \
-                            .replace('""', '.').replace("'", ':')
+                               .replace('""', '.').replace("'", ':')
                 except AttributeError:
                     next_igt = values[i+1][3].replace('"', '.').replace("'", ':')
 
@@ -169,31 +170,39 @@ def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
             pass
     return records
 
-def get_ss_records(creds: Credentials) -> list[tuple[str, str, str]]:
+def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     '''
     Gets new Single Star WRs from spreadsheet and creates
     a list of tuples that hold the new times, links, and
     star names
     '''
     try:
-        service = build('sheets', 'v4', credentials=creds)
-        sheet = service.spreadsheets()
-        result = sheet.values().get(spreadsheetId=SS_SHEET,
-                 range=SS_RANGE, valueRenderOption='FORMULA').execute()
-        values = result.get('values', [])
+        if creds:
+            service = build('sheets', 'v4', credentials=creds)
+            sheet = service.spreadsheets()
+            result = sheet.values().get(spreadsheetId=SS_SHEET,
+                    range=SS_RANGE, valueRenderOption='FORMULA').execute()
+            values = result.get('values', [])
 
-        if not values:
-            print('No data found in sheet')
-            return
+            if not values:
+                print('No data found in sheet')
+                return
 
         # Read locally stored records
         local_records = []
         with open('last_saved_ss.txt', 'r') as file:
             for line in file:
                 local_records.append(literal_eval(line.strip('\n')))
-        # Parse records pulled from spreadsheet
-        cur_records = parse_ss_values(values)
-
+        if creds:
+            # Parse records pulled from spreadsheet
+            cur_records = parse_ss_values(values)
+        else:
+            # For Debug / Testing
+            cur_records = []
+            with open('test_ss_raw.txt', 'r') as file:
+                for line in file:
+                    cur_records.append(line)
+            cur_records = parse_ss_values(cur_records)
         # Write current records to local file
         # with open('last_saved_ss.txt', 'w+') as file:
         #     for record in cur_records:
@@ -267,9 +276,7 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
                 else:
                     time_f = float(time)
                 if time_f < best_star_time or cur_star_strategy_count == 0:
-                    cur_row = ((time,                        # Time
-                                i['values'][1]['hyperlink'], # Link
-                                cur_star_name))              # Name
+                    cur_row = ((time, i['values'][1]['hyperlink'], cur_star_name))
                     best_star_time = time_f
 
                 prev_strategy_index = strategy_index
@@ -284,7 +291,7 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
         # Remove the [1] from the star name
         cur_star_name = records[i][2][4:]
 
-        # Special case handling (ugliest code of all time award)...
+        # Special case handling (worst design of all time award)...
         if cur_star_name == 'Big Penguin Race + 100c (JP)':
             records.remove(records[i])
         elif cur_star_name == 'Race + 100c atmpas special route (JP)':
@@ -312,6 +319,13 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
                 cur_star_name = cur_star_name[:-20]
             else:
                 cur_star_name = cur_star_name[:-5]
+
+        # Doing this here so that the names of the RTA and 
+        # single star sheet row labels are the same for
+        # Bowser course records, which makes life easier
+        # in the main script when parsing record names
+        if 'Course' in cur_star_name:
+            cur_star_name = cur_star_name.replace('(', '').replace(')', '')
 
         # Converting from spreadsheet 100 coin naming scheme
         # to Ukiki 100 coin naming scheme
@@ -347,8 +361,13 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
                     cur_star_name = 'TTC 100 Coins'
                 case 'The Big House in the Sky + 100c':
                     cur_star_name = 'RR 100 Coins'
-
-        parsed_record = (records[i][0], records[i][1], cur_star_name)
+        # If cur_star_name is already in records, append a 2 to the end
+        # of the tuple (this is to distinguish between multi-strategy
+        # 100c stars)
+        if cur_star_name in [j[2] for j in records]:
+            parsed_record = (records[i][0], records[i][1], cur_star_name, 2)
+        else:
+            parsed_record = (records[i][0], records[i][1], cur_star_name)
         records[i] = parsed_record
 
     # for i in records:
@@ -372,30 +391,34 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         # at star names either, because some rows are just
         # named by strategy, with no mention of star name :|
 
-        service = build('sheets', 'v4', credentials=creds)
-        sheet = service.spreadsheets()
-        result = sheet.get(spreadsheetId=RTA_SHEET,
-                 ranges=RTA_RANGE,
-                 fields='sheets/data/rowData/values(userEnteredFormat/textFormat/bold,hyperlink,effectiveValue/stringValue)').execute() # monstrosity
+        if creds:
+            service = build('sheets', 'v4', credentials=creds)
+            sheet = service.spreadsheets()
+            result = sheet.get(spreadsheetId=RTA_SHEET,
+                    ranges=RTA_RANGE,
+                    fields='sheets/data/rowData/values(userEnteredFormat/textFormat/bold,hyperlink,effectiveValue/stringValue)').execute() # monstrosity
 
-        if not result:
-            print('No data found in sheet')
-            return
+            if not result:
+                print('No data found in sheet')
+                return
 
         # Read locally stored records
         local_records = []
         with open('last_saved_rta.txt', 'r') as file:
             for line in file:
                 local_records.append(literal_eval(line.strip('\n')))
-        # # For Debug / Testing
-        # json_test_wrs = {}
-        # with open('j2.json', 'r') as file:
-        #     json_test_wrs = json.load(file)
-        # Parse records pulled from spreadsheet
-        cur_records = parse_rta_values(result)
+        if creds:
+            # Parse records pulled from spreadsheet
+            cur_records = parse_rta_values(result)
+        else:
+            # For Debug / Testing
+            json_test_wrs = {}
+            with open('j2.json', 'r') as file:
+                json_test_wrs = json.load(file)
+                cur_records = parse_rta_values(json_test_wrs)
 
         # Write current records to local file
-        # with open('last_saved_rta.txt', 'w+') as file:
+        # with open('last_saved_rta_2.txt', 'w+') as file:
         #     for record in cur_records:
         #         file.write(str(record)+'\n')
 
@@ -408,8 +431,8 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
 # Test Driver Code
 if __name__ == '__main__':
     CREDS = get_creds()
-    # new_records = get_ss_records(CREDS)
-    new_records = get_rta_records(CREDS)
+    new_records = get_ss_records()
+    # new_records = get_rta_records()
     print('New records:')
     for record in new_records:
         print(record)
