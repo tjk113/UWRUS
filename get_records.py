@@ -1,3 +1,4 @@
+from genericpath import exists
 import os.path
 import json
 import re
@@ -8,6 +9,8 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.errors import HttpError
 from googleapiclient.discovery import build
 from ast import literal_eval
+
+from common import prefix_print, bcolors
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
@@ -22,6 +25,12 @@ RTA_RANGE = ['Ultimate Star Spreadsheet v2!A:B']
 
 record_parse = re.compile(r'=HYPERLINK\("(?P<link>.+)?";"(?P<time>.+)"\)')
 row_label_parse = re.compile(r'\[(?P<strategy_index>\d)\]')
+
+# Current records list to be saved
+RECORDS_TO_SAVE = []
+# Records not to save (because they encountered
+# some error in the main script)
+RECORDS_NOT_TO_SAVE = []
 
 # Note: it'd be nice to use named tuples, but given that literal_eval
 # can't parse user-defined types, the extra code required to make them
@@ -42,7 +51,7 @@ def get_creds() -> Credentials:
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
-        print('Updating Google Sheets API credentials...', end='')
+        prefix_print('Updating Google Sheets API credentials...', end='')
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
@@ -52,6 +61,7 @@ def get_creds() -> Credentials:
         # Save the credentials for the next run
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
+        print(f'{bcolors.OKGREEN}Success{bcolors.ENDC}')
     return creds
 
 def remove_mins_place(record: str) -> float:
@@ -100,6 +110,12 @@ def get_new_records(local_records: list[tuple[str, str, str]], \
              str(temp_time)[1] != str(temp_time_2)[1]:
                  local_record = cur_record
     return cur_records
+
+def set_record_not_to_save(record: tuple[str, str, str]) -> None:
+    '''
+    Mark a record not to be saved to local file
+    '''
+    RECORDS_NOT_TO_SAVE.append(record)
 
 def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
     '''
@@ -180,6 +196,7 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     a list of tuples that hold the new times, links, and
     star names
     '''
+    global RECORDS_TO_SAVE, RECORDS_NOT_TO_SAVE
     try:
         if creds:
             service = build('sheets', 'v4', credentials=creds)
@@ -194,29 +211,48 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
 
         # Read locally stored records
         local_records = []
-        with open('last_saved_ss.txt', 'r') as file:
+        with open('.\\local_records\\last_saved_ss.txt', 'r') as file:
             for line in file:
                 local_records.append(literal_eval(line.strip('\n')))
         if creds:
             # Parse records pulled from spreadsheet
             cur_records = parse_ss_values(values)
-        else:
+        elif creds == 'DEBUG':
             # For Debug / Testing
             cur_records = []
             with open('test_ss_raw.txt', 'r') as file:
                 for line in file:
                     cur_records.append(line)
             cur_records = parse_ss_values(cur_records)
-        # Write current records to local file
-        with open('last_saved_ss.txt', 'w+') as file:
-            for record in cur_records:
-                file.write(str(record)+'\n')
+        else:
+            return
+
+        # Set RECORDS_TO_SAVE, and
+        # reset RECORDS_NOT_TO_SAVE
+        RECORDS_TO_SAVE = cur_records
+        RECORDS_NOT_TO_SAVE = []
+
+        # Save records if it's the first time running
+        # or if the file somehow gets deleted
+        if not exists('.\\local_records\\last_saved_ss.txt'):
+            save_ss_records()
 
     except HttpError as err:
-        print(err)
+        prefix_print(f'{bcolors.FAIL}Google Sheets API Error:{bcolors.ENDC} {err}')
+        return
 
     new_records = get_new_records(local_records, cur_records)
     return new_records
+
+def save_ss_records() -> None:
+    '''
+    Write current single star records to local file
+    (minus records set not to save)
+    '''
+    with open('.\\local_records\\last_saved_ss.txt', 'w+') as file:
+        # Only save records that aren't in RECORDS_NOT_TO_SAVE
+        for record in [i for i in RECORDS_TO_SAVE if i not in RECORDS_NOT_TO_SAVE]:
+            file.write(str(record)+'\n')
 
 def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
     '''
@@ -257,8 +293,15 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
                 # was likely [x|x], some variation of that,
                 # or a blank row
                 if strategy_index == None:
-                    continue
-                strategy_index = strategy_index.group('strategy_index')
+                    # Special case handling for Bowser stage red coin
+                    # stars, where we do actually want to parse
+                    # the [x|x]-indexed x-cam records...
+                    if 'Bowser' in cur_star_name and 'Red Coins' in cur_star_name:
+                        strategy_index = '3'
+                    else:
+                        continue
+                else:
+                    strategy_index = strategy_index.group('strategy_index')
 
                 # Skip over non-full-star rows (still allows
                 # for cases where there may only be one
@@ -384,6 +427,7 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     a list of tuples that hold the new times, links, and
     row labels
     '''
+    global RECORDS_TO_SAVE, RECORDS_NOT_TO_SAVE
     try:
         # TODO: have to get extensions sheet data as well...
         # otherwise faster times that exist on there will
@@ -408,35 +452,59 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
 
         # Read locally stored records
         local_records = []
-        with open('last_saved_rta.txt', 'r') as file:
+        with open('.\\local_records\\last_saved_rta.txt', 'r') as file:
             for line in file:
                 local_records.append(literal_eval(line.strip('\n')))
         if creds:
             # Parse records pulled from spreadsheet
             cur_records = parse_rta_values(result)
-        else:
+        elif creds == 'DEBUG':
             # For Debug / Testing
             json_test_wrs = {}
             with open('j2.json', 'r') as file:
                 json_test_wrs = json.load(file)
                 cur_records = parse_rta_values(json_test_wrs)
+        else:
+            return
 
-        # Write current records to local file
-        with open('last_saved_rta.txt', 'w+') as file:
-            for record in cur_records:
-                file.write(str(record)+'\n')
+        # Set RECORDS_TO_SAVE, and
+        # reset RECORDS_NOT_TO_SAVE
+        RECORDS_TO_SAVE = cur_records
+        RECORDS_NOT_TO_SAVE = []
+
+        # Save records if it's the first time running
+        # or if the file somehow gets deleted
+        if not exists('.\\local_records\\last_saved_rta.txt'):
+            save_rta_records()
 
     except HttpError as err:
-        print(err)
+        prefix_print(f'{bcolors.FAIL}Google Sheets API Error:{bcolors.ENDC} {err}')
+        return
 
     new_records = get_new_records(local_records, cur_records)
     return new_records
 
+def save_rta_records() -> None:
+    '''
+    Write current RTA records to local file
+    (minus records set not to save)
+    '''
+    with open('.\\local_records\\last_saved_rta.txt', 'w+') as file:
+        # Only save records that aren't in RECORDS_NOT_TO_SAVE
+        for record in [i for i in RECORDS_TO_SAVE if i not in RECORDS_NOT_TO_SAVE]:
+            file.write(str(record)+'\n')
+
 # Test Driver Code
 if __name__ == '__main__':
     CREDS = get_creds()
-    new_records = get_ss_records()
-    # new_records = get_rta_records()
+    # new_records = get_ss_records()
+    new_records = get_rta_records(CREDS)
+    save_rta_records()
+    print('New records:')
+    for record in new_records:
+        print(record)
+    new_records = get_ss_records(CREDS)
+    save_ss_records()
     print('New records:')
     for record in new_records:
         print(record)

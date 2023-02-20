@@ -18,12 +18,12 @@ def replace_page_text(cur_page_text: str, parsed_records: str, \
     # that is already updated (or has a faster time due
     # to me ignoring the extensions sheet for now),
     # don't bother updating it again.
-    parsed_cur_records = record_text_pattern.findall(parsed_records)
-    for cur_record, new_record in zip(parsed_cur_records, new_records):
+    for cur_record, new_record in zip(cur_records, new_records):
+        cur_record = record_text_pattern.findall(cur_record)
         specifier_text = None
         if len(cur_record) > 1:
             specifier_text = cur_record[1]
-        cur_record_time = cur_record[0]
+        cur_record_time = cur_record[0][0]
         new_record_time = new_record[0]
         if new_record_time == cur_record_time:
             # Main script expects page_text to be None
@@ -45,6 +45,7 @@ def replace_page_text(cur_page_text: str, parsed_records: str, \
     # Replace provided record tuples with properly formatted
     # strings, and update those records in the page text
     new_page_text = cur_page_text
+    parsed_cur_records = record_text_pattern.findall(parsed_records)
     for cur_record, new_record in zip(cur_records, new_records):
         # Note: this can't handle a scenario in which
         # there is a new rta record and a new best available
@@ -127,7 +128,7 @@ def replace_record_bowser(cur_page_text: str, new_rta_course_record: tuple[str, 
                                  +'(?P<rta_reds_record>.+[\]\)])\n'
                                  +'\|ss_record=(?P<ss_course_record>.+[\]\)]) \/ '
                                  +'(?P<ss_reds_record>.+[\]\)])\n'
-                                 +'\|throw_record=(?P<throw_record>.+[\]\)])\n')
+                                 +'\|throws?_record=(?P<throw_record>.+[\]\)])\n')
     parsed_records = records_pattern.search(cur_page_text)
 
     new_records = [i for i in [new_rta_course_record, new_rta_reds_record,
@@ -174,7 +175,7 @@ def replace_record_multi_100c(cur_page_text: str, new_rta_100c_record_1:  tuple[
 
 # Test Driver Code
 if __name__ == '__main__':
-    page_text = 'reg'
+    page_text = 'bowser'
     page_text_cpy = page_text
 
     if page_text == 'bowser':
@@ -198,16 +199,17 @@ if __name__ == '__main__':
         new_ss_100c_wr = ('1:08.36', 'https://www.youtube.com/watch?v=p8u_k2LIZyo')
         new_text, edit_summary = replace_record(page_text, new_rta_record=new_rta_100c_wr, new_ss_record=new_ss_100c_wr)
     elif page_text_cpy == 'bowser':
-        new_bowser_course_rta_wr = ('26.30', 'https://www.youtube.com/watch?v=wr4x8ngvhjc')
-        new_bowser_reds_rta_wr = ('42.30', 'https://www.youtube.com/watch?v=Do5_wU9X1pc')
-        new_bowser_course_ss_wr = ('23.76 (IGT)', 'https://youtu.be/8dwSydGAJsk')
-        new_bowser_reds_ss_wr = ('41.72', 'https://youtu.be/uhk_vPPXhLM')
+        # new_bowser_course_rta_wr = ('26.30', 'https://www.youtube.com/watch?v=wr4x8ngvhjc')
+        # new_bowser_reds_rta_wr = ('42.30', 'https://www.youtube.com/watch?v=Do5_wU9X1pc')
+        # new_bowser_course_ss_wr = ('23.76 (IGT)', 'https://youtu.be/8dwSydGAJsk')
+        # new_bowser_reds_ss_wr = ('41.72', 'https://youtu.be/uhk_vPPXhLM')
         new_bowser_throw_wr = ('24.83', 'https://www.youtube.com/watch?v=84r1NnU5WRc')
-        new_text, edit_summary = \
-            replace_record_bowser(page_text, new_rta_course_record=new_bowser_course_rta_wr,
-                                new_rta_reds_record=new_bowser_reds_rta_wr, new_ss_course_record= \
-                                new_bowser_course_ss_wr, new_ss_reds_record=new_bowser_reds_ss_wr,
-                                new_throw_record=new_bowser_throw_wr)
+        # new_text, edit_summary = \
+            # replace_record_bowser(page_text, new_rta_course_record=new_bowser_course_rta_wr,
+            #                     new_rta_reds_record=new_bowser_reds_rta_wr, new_ss_course_record= \
+            #                     new_bowser_course_ss_wr, new_ss_reds_record=new_bowser_reds_ss_wr,
+            #                     new_throw_record=new_bowser_throw_wr)
+        new_text, edit_summary = replace_record_bowser(page_text, new_throw_record=new_bowser_throw_wr)
     elif page_text_cpy == 'reg':
         new_rta_wr = ('17.40', 'https://www.youtube.com/watch?v=W72cyc5sESo')
         # new_rta_wr = None
