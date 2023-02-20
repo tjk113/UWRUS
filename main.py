@@ -20,36 +20,45 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+def prefix_print(str: str, end: str = '\n') -> None:
+    '''
+    Prints provided string with a '[UWRUS]: ' prefix
+    '''
+    print(f'[{bcolors.OKCYAN}UWRUS{bcolors.ENDC}]: {str}', end=end)
+
 def main():
     log = Log()
+    # Get new RTA and single star records from their respective spreadsheets
     SHEETS_CREDS = get_creds()
-    # test_page = 'User:Tjk113'
-    # test_new_wr = ('0.00', 'https://www.youtube.com/watch?v=9yjZpBq1XBE')
     new_rta_records = get_rta_records(SHEETS_CREDS)
     new_ss_records = get_ss_records(SHEETS_CREDS)
+    # new_rta_records = []
+    # new_ss_records = [('0.00', 'https://www.youtube.com/watch?v=9yjZpBq1XBE', 'User:Tjk113')]
 
+    # Output log and stop execution if there are no new records to update
     if new_rta_records == None:
         msg = 'Failed to retrieve data from RTA spreadsheet!'
         log.add_error_message(msg)
         log.out()
-        print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
+        prefix_print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
         return
     if new_ss_records == None:
         msg = 'Failed to retrieve data from single star spreadsheet!'
         log.add_error_message(msg)
         log.out()
-        print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
+        prefix_print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
         return
     if new_ss_records == [] and new_rta_records == []:
         log.set_nothing_to_update(True)
         log.out()
-        print('No new single star or RTA records to update...')
+        prefix_print('No new single star or RTA records to update...')
         return
     if new_ss_records == []:
-        print('No new single star records to update...')
+        prefix_print('No new single star records to update...')
     if new_rta_records == []:
-        print('No new RTA records to update...')
+        prefix_print('No new RTA records to update...')
 
+    # Get login token for Ukikipedia
     BOT_USER = ''
     BOT_PASS = ''
     API = 'https://ukikipedia.net/mediawiki/api.php'
@@ -60,10 +69,11 @@ def main():
         'type'  : 'login',
         'format': 'json'
     }
-    print(f'Logging in to "{BOT_USER}"...', end='')
+    prefix_print(f'Logging in to "{BOT_USER}"...', end='')
     response = SESSION.get(url=API, params=req_params).json()
     LOGIN_TOKEN = response['query']['tokens']['logintoken']
 
+    # Login to Ukikipedia
     req_params = {
         'action'    : 'login',
         'lgname'    : BOT_USER,
@@ -80,17 +90,25 @@ def main():
         print(f'{bcolors.FAIL}Failed{bcolors.ENDC}')
         return
 
-    # Thank you itertools!
+    # Iterate over new RTA and single star records. The replace_record functions can set both an RTA
+    # and a single star record in a single edit request to a given star page, but will only act upon
+    # the arguments they're given. So if there is only an RTA or single star record to update for a
+    # given star's page, then the other record will be passed as None to the appropriate replace_record
+    # function (as per the fillvalue in the zip_longest call). 
     for new_rta_record, new_ss_record in zip_longest(new_rta_records, new_ss_records, fillvalue=None):
 
         sleep(1)
 
+        # Get star name from whichever record isn't currently None
         new_record_star_name = new_rta_record[2] if new_rta_record != None else new_ss_record[2]
+        # Special case handling control variables
         is_bowser_course_record = False
         is_bowser_reds_record = False
         is_first_100c_record = False
         is_second_multi_100c_record = False
 
+        # Format bowser stage records appropriately and
+        # update the respective control variable
         if new_record_star_name[:6] == 'Bowser':
             if 'Course' in new_record_star_name:
                 new_record_star_name = new_record_star_name[:-9]
@@ -98,12 +116,22 @@ def main():
             else:
                 new_record_star_name = new_record_star_name[:-10]
                 is_bowser_reds_record = True
-        elif '100' in new_record_star_name:
+        # Special case handling for multi-strategy 100c stars
+        elif new_rta_record and '100' in new_record_star_name:
             if 2 not in [i for i in new_rta_record]:
                 is_first_100c_record = True
             else:
                 is_second_multi_100c_record = True
 
+        # If the current star is the second record for a
+        # multi-strategy 100c star, add '2' to the current
+        # star name in the log
+        if is_second_multi_100c_record:
+            log.add_star_name(new_record_star_name + ' 2', 'RTA')
+        else:
+            log.add_star_name(new_record_star_name, ('RTA' if new_rta_record != None else 'SS'))
+
+        # Get current star's RTA Guide page text
         req_params = {
             'action'       : 'query',
             'meta'         : 'tokens',
@@ -120,7 +148,7 @@ def main():
         if not '{{speedrun_infobox' in page_text or '{{speedrun_infobox_bowser_level' in page_text:
             msg = f"Couldn't get page content for star '{new_record_star_name}'"
             log.add_update_result(msg)
-            print(f"{msg}: {bcolors.FAIL}Failed{bcolors.ENDC}")
+            prefix_print(f"{msg}: {bcolors.FAIL}Failed{bcolors.ENDC}")
             continue
 
         BASE_TIMESTAMP  = response['query']['pages'][0]['revisions'][0]['timestamp']
@@ -140,9 +168,6 @@ def main():
         # Normal record handling
         else:
             page_text, summary = replace_record(page_text, new_rta_record=new_rta_record, new_ss_record=new_ss_record)
-        
-        print(page_text)
-        print(summary)
 
         # page_text will be None if the record is
         # already updated (or has a faster time due
@@ -152,11 +177,13 @@ def main():
             # I did it like this because I wanted to
             msg = '"age is either already updated or has a faster time than was provided!"'
             log.add_update_result('P'+msg)
-            print(f"{new_record_star_name}'s p{msg} Skipping record...")
+            prefix_print(f"{new_record_star_name}'s p{msg} Skipping record...")
             continue
 
         sleep(1)
 
+        # Edit the current star's RTA Guide page with the new
+        # updated page text containing the new record(s)
         req_params = {
             'action'        : 'edit',
             'title'         : 'RTA Guide/' + new_record_star_name,
@@ -168,7 +195,7 @@ def main():
             'summary'       : summary,
             'format'        : 'json'
         }
-        print(f'Editing page "RTA Guide/{new_record_star_name}"...', end='')
+        prefix_print(f'Editing page "RTA Guide/{new_record_star_name}"...', end='')
         response = SESSION.post(API, data=req_params).json()
         if response['edit']['result'] == 'Success':
             log.add_update_result('Success')
@@ -176,6 +203,7 @@ def main():
         else:
             log.add_update_result(f"\"Failed to edit page 'RTA Guide/{new_record_star_name}'\"")
             print(f'{bcolors.FAIL}Failed{bcolors.ENDC}')
+    # Output log at the end of the session
     log.out()
 
 if __name__ == '__main__':

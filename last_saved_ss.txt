@@ -53,7 +53,7 @@
 ('44.91', 'https://www.youtube.com/watch?v=1IxZGbSsVf0', 'Stand Tall on the Four Pillars')
 ('42.30', 'https://www.youtube.com/watch?v=gJVYopMiEJs', 'Free Flying for 8 Red Coins')
 ('24.49', 'https://www.youtube.com/watch?v=spotFdOLmmI', 'Pyramid Puzzle')
-('1:33.56 (IGT)', 'https://www.youtube.com/watch?v=WDZ6zvMbIYY', 'SSL 100 Coins')
+('1:33.53 (IGT)', 'https://www.youtube.com/watch?v=E62dVPOo5FI', 'SSL 100 Coins')
 ('30.08', 'https://www.youtube.com/watch?v=xClgDlt5LeY', "Board Bowser's Sub")
 ('28.59', 'https://www.youtube.com/watch?v=2N5KlzDUdnM', 'Chests in the Current')
 ('57.80', 'https://www.youtube.com/watch?v=3AeQ5pgqS58', 'Pole-Jumping for Red Coins')

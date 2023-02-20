@@ -23,6 +23,9 @@ class Log:
         self.__error_message = error_message
 
     def out(self):
+        '''
+        Outputs current log data to file
+        '''
         if not os.path.exists('.\\logs'):
             os.mkdir('.\\logs')
         with open(f'logs\\{self.__timestamp}.log', 'w+') as file:
@@ -31,7 +34,7 @@ class Log:
                 file.write('Info="No new RTA or SS records to update"')
                 return
             if self.__star_names:
-                for i, star_name, update_result in enumerate(zip(self.__star_names, self.__update_results)):
+                for i, (star_name, update_result) in enumerate(zip(self.__star_names, self.__update_results)):
                     file.write(f'star_name_{i}={star_name}\nupdate_result_{i}={update_result}\n')
             if self.__error_message:
                 file.write(f'Error="{self.__error_message}"')

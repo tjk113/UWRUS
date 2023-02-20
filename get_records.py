@@ -30,6 +30,10 @@ row_label_parse = re.compile(r'\[(?P<strategy_index>\d)\]')
 # be rewritten with them.
 
 def get_creds() -> Credentials:
+    '''
+    Retrieve Google Sheets API Credentials, or renew
+    them if necessary
+    '''
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
@@ -154,7 +158,7 @@ def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
             time = res.group('time').replace('""', '.').replace("'", ':')
             link = res.group('link')
 
-            # Check if star name is already in records
+            # Check if video link is already in records
             if link not in [i[1] for i in records]:
                 # If the star name is blank and it's an IGT record,
                 # then use the star name from the previous row
@@ -204,9 +208,9 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
                     cur_records.append(line)
             cur_records = parse_ss_values(cur_records)
         # Write current records to local file
-        # with open('last_saved_ss.txt', 'w+') as file:
-        #     for record in cur_records:
-        #         file.write(str(record)+'\n')
+        with open('last_saved_ss.txt', 'w+') as file:
+            for record in cur_records:
+                file.write(str(record)+'\n')
 
     except HttpError as err:
         print(err)
@@ -239,7 +243,6 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
                 # set as cur_row (which prev_row is set to), append
                 # the row to records and reset cur_star_strategy_count
                 if is_bold and cur_star_strategy_count >= 1:
-                    # print(prev_row)
                     records.append(prev_row)
                     cur_star_strategy_count = 0
                 
@@ -257,10 +260,10 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
                     continue
                 strategy_index = strategy_index.group('strategy_index')
 
-                # Skip over non-full-star rows
-                # Allows cases where there may only be one
+                # Skip over non-full-star rows (still allows
+                # for cases where there may only be one
                 # strategy for a row, meaning there will be
-                # two consecutive rows labels starting with [1]
+                # two consecutive rows labels starting with [1])
                 if strategy_index == prev_strategy_index and not is_bold:
                     continue
 
@@ -270,6 +273,9 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
                 if strategy_index == '1':
                     cur_star_name = row_label
 
+                # Update best strategy time for the current star if
+                # a faster time is parsed, or if this is the first
+                # iteration
                 time = i['values'][1]['effectiveValue']['stringValue']
                 if ':' in time:
                     time_f = remove_mins_place(time)
@@ -370,8 +376,6 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
             parsed_record = (records[i][0], records[i][1], cur_star_name)
         records[i] = parsed_record
 
-    # for i in records:
-    #     print(i)
     return records
 
 def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
@@ -418,9 +422,9 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
                 cur_records = parse_rta_values(json_test_wrs)
 
         # Write current records to local file
-        # with open('last_saved_rta_2.txt', 'w+') as file:
-        #     for record in cur_records:
-        #         file.write(str(record)+'\n')
+        with open('last_saved_rta.txt', 'w+') as file:
+            for record in cur_records:
+                file.write(str(record)+'\n')
 
     except HttpError as err:
         print(err)
