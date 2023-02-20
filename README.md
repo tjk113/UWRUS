@@ -1,11 +1,10 @@
 # Ukikipedia World Record Update Script (UWRUS)
 
-Automatically pulls new X-Cam and Single Star world records from their spreadsheets and updates it on the star's RTA Guide page
+Automatically updates RTA and Single Star world records on [Ukikipedia's RTA Guide](https://ukikipedia.net/wiki/RTA_Guide).
 
 ## Current functionality:
-Can update single star records
+Mostly operational(?)
 
 ## // TODO:
-- Figure out how exactly we're getting WR updates. On what schedule will the script run?
-- For X-Cam records, make sure that we're pulling the record for the fastest RTA strat (unless otherwise specified)
-- Generally figure out how to deal with 100c and bowser stage pages 
+- Continue fixing bugs as they are discovered 🐜
+- Figure out where this will be hosted
