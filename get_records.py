@@ -21,11 +21,11 @@ SS_RANGE = 'Singlestar!B:E'
 RTA_SHEET = '1J20aivGnvLlAuyRIMMclIFUmrkHXUzgcDmYa31gdtCI'
 RTA_RANGE = ['Ultimate Star Spreadsheet v2!A:B']
 
-# Current records list to be saved
-RECORDS_TO_SAVE = []
+# Current records lists to be saved
+RTA_RECORDS_TO_SAVE = SS_RECORDS_TO_SAVE = []
 # Records not to save (because they encountered
 # some error in the main script)
-RECORDS_NOT_TO_SAVE = []
+RTA_RECORDS_NOT_TO_SAVE = SS_RECORDS_NOT_TO_SAVE = []
 
 # Note: it'd be nice to use named tuples, but given that literal_eval
 # can't parse user-defined types, the extra code required to make them
@@ -107,12 +107,6 @@ def get_new_records(local_records: list[tuple[str, str, str]], \
                  local_record = cur_record
     return cur_records
 
-def set_record_not_to_save(record: tuple[str, str, str]) -> None:
-    '''
-    Mark a record not to be saved to local file
-    '''
-    RECORDS_NOT_TO_SAVE.append(record)
-
 def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
     '''
     Parses raw single star spreadsheet values, formats each
@@ -193,7 +187,7 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     a list of tuples that hold the new times, links, and
     star names
     '''
-    global SS_SHEET, SS_RANGE, RECORDS_TO_SAVE, RECORDS_NOT_TO_SAVE
+    global SS_SHEET, SS_RANGE, SS_RECORDS_TO_SAVE, SS_RECORDS_NOT_TO_SAVE
     try:
         if creds:
             service = build('sheets', 'v4', credentials=creds)
@@ -226,8 +220,8 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
 
         # Set RECORDS_TO_SAVE, and
         # reset RECORDS_NOT_TO_SAVE
-        RECORDS_TO_SAVE = cur_records
-        RECORDS_NOT_TO_SAVE = []
+        SS_RECORDS_TO_SAVE = cur_records
+        SS_RECORDS_NOT_TO_SAVE = []
 
         # Save records if it's the first time running
         # or if the file somehow gets deleted
@@ -241,15 +235,24 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     new_records = get_new_records(local_records, cur_records)
     return new_records
 
+def set_ss_record_not_to_save(record: tuple[str, str, str]) -> None:
+    '''
+    Mark a single star record not to be saved to local file
+    '''
+    global SS_RECORDS_NOT_TO_SAVE
+    SS_RECORDS_NOT_TO_SAVE.append(record)
+
 def save_ss_records() -> None:
     '''
     Write current single star records to local file
     (minus records set not to save)
     '''
-    with open('.\\local_records\\last_saved_ss.txt', 'w+') as file:
-        # Only save records that aren't in RECORDS_NOT_TO_SAVE
-        for record in [i for i in RECORDS_TO_SAVE if i not in RECORDS_NOT_TO_SAVE]:
-            file.write(str(record)+'\n')
+    global SS_RECORDS_TO_SAVE, SS_RECORDS_NOT_TO_SAVE
+    if SS_RECORDS_TO_SAVE:
+        with open('.\\local_records\\last_saved_ss.txt', 'w+') as file:
+            # Only save records that aren't in RECORDS_NOT_TO_SAVE
+            for record in [i for i in SS_RECORDS_TO_SAVE if i not in SS_RECORDS_NOT_TO_SAVE]:
+                file.write(str(record)+'\n')
 
 def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
     '''
@@ -425,7 +428,7 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     a list of tuples that hold the new times, links, and
     row labels
     '''
-    global RTA_SHEET, RTA_RANGE, RECORDS_TO_SAVE, RECORDS_NOT_TO_SAVE
+    global RTA_SHEET, RTA_RANGE, SS_RECORDS_TO_SAVE, SS_RECORDS_NOT_TO_SAVE
     try:
         # TODO: have to get extensions sheet data as well...
         # otherwise faster times that exist on there will
@@ -467,8 +470,8 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
 
         # Set RECORDS_TO_SAVE, and
         # reset RECORDS_NOT_TO_SAVE
-        RECORDS_TO_SAVE = cur_records
-        RECORDS_NOT_TO_SAVE = []
+        SS_RECORDS_TO_SAVE = cur_records
+        SS_RECORDS_NOT_TO_SAVE = []
 
         # Save records if it's the first time running
         # or if the file somehow gets deleted
@@ -482,20 +485,28 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     new_records = get_new_records(local_records, cur_records)
     return new_records
 
+def set_rta_record_not_to_save(record: tuple[str, str, str]) -> None:
+    '''
+    Mark an RTA record not to be saved to local file
+    '''
+    global RTA_RECORDS_NOT_TO_SAVE
+    RTA_RECORDS_NOT_TO_SAVE.append(record)
+
 def save_rta_records() -> None:
     '''
     Write current RTA records to local file
     (minus records set not to save)
     '''
-    with open('.\\local_records\\last_saved_rta.txt', 'w+') as file:
-        # Only save records that aren't in RECORDS_NOT_TO_SAVE
-        for record in [i for i in RECORDS_TO_SAVE if i not in RECORDS_NOT_TO_SAVE]:
-            file.write(str(record)+'\n')
+    global RTA_RECORDS_TO_SAVE, RTA_RECORDS_NOT_TO_SAVE
+    if RTA_RECORDS_TO_SAVE:
+        with open('.\\local_records\\last_saved_rta.txt', 'w+') as file:
+            # Only save records that aren't in RECORDS_NOT_TO_SAVE
+            for record in [i for i in RTA_RECORDS_TO_SAVE if i not in RTA_RECORDS_NOT_TO_SAVE]:
+                file.write(str(record)+'\n')
 
 # Test Driver Code
 if __name__ == '__main__':
     CREDS = get_creds()
-    # new_records = get_ss_records()
     new_records = get_rta_records(CREDS)
     save_rta_records()
     print('New records:')
