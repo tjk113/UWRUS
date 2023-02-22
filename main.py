@@ -1,45 +1,45 @@
 import requests
 import json
+import time
 
 from itertools import zip_longest
-from time import sleep
 
-from get_records import get_rta_records, save_rta_records, get_ss_records, save_ss_records, set_record_not_to_save, get_creds
+from get_records import get_rta_records, save_rta_records,     \
+                        get_ss_records, save_ss_records,       \
+                        get_creds, set_rta_record_not_to_save, \
+                        set_ss_record_not_to_save
 from replace_record import replace_record, replace_record_bowser, replace_record_multi_100c
 from common import prefix_print, bcolors
 from log import Log
 
 def main():
-    log = Log()
-    # Get new RTA and single star records from their respective spreadsheets
-    SHEETS_CREDS = get_creds()
-    new_rta_records = get_rta_records(SHEETS_CREDS)
-    new_ss_records = get_ss_records(SHEETS_CREDS)
-
-    # Output log and stop execution if there are no new records to update
-    if new_rta_records == None:
-        msg = 'Failed to retrieve data from RTA spreadsheet!'
-        log.add_error_message(msg)
-        log.out()
-        prefix_print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
-        return
-    if new_ss_records == None:
-        msg = 'Failed to retrieve data from single star spreadsheet!'
-        log.add_error_message(msg)
-        log.out()
-        prefix_print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
-        return
-    if new_rta_records == [] and new_ss_records == []:
-        log.set_nothing_to_update(True)
-        log.out()
-        prefix_print('No new single star or RTA records to update...')
-        return
-    if new_rta_records == []:
-        prefix_print('No new RTA records to update...')
-    if new_ss_records == []:
-        prefix_print('No new single star records to update...')
-    
     try:
+        t1 = time.time()
+        log = Log()
+        # Get new RTA and single star records from their respective spreadsheets
+        SHEETS_CREDS = get_creds()
+        new_rta_records = get_rta_records(SHEETS_CREDS)
+        new_ss_records = get_ss_records(SHEETS_CREDS)
+
+        # Output log and stop execution if there are no new records to update
+        if new_rta_records == None:
+            msg = 'Failed to retrieve data from RTA spreadsheet!'
+            log.add_error_message(msg)
+            prefix_print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
+            return
+        if new_ss_records == None:
+            msg = 'Failed to retrieve data from single star spreadsheet!'
+            log.add_error_message(msg)
+            prefix_print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
+            return
+        if new_rta_records == [] and new_ss_records == []:
+            log.set_nothing_to_update(True)
+            prefix_print('No new single star or RTA records to update...')
+            return
+        if new_rta_records == []:
+            prefix_print('No new RTA records to update...')
+        if new_ss_records == []:
+            prefix_print('No new single star records to update...')
 
         # Get login token for Ukikipedia
         BOT_USER = ''
@@ -80,7 +80,7 @@ def main():
         # function (as per the fillvalue in the zip_longest call). 
         for new_rta_record, new_ss_record in zip_longest(new_rta_records, new_ss_records, fillvalue=None):
 
-            sleep(1)
+            time.sleep(0.5)
 
             # Get star name from whichever record isn't currently None
             new_record_star_name = new_rta_record[2] if new_rta_record != None else new_ss_record[2]
@@ -128,13 +128,15 @@ def main():
             }
             response = json.loads(SESSION.get(url=API, params=req_params).text)
             page_text = response['query']['pages'][0]['revisions'][0]['slots']['main']['content']
-            if not '{{speedrun_infobox' in page_text or not '{{speedrun_infobox_bowser_level' in page_text:
+            if not '{{speedrun_infobox' in page_text and not '{{speedrun_infobox_bowser_level' in page_text:
                 msg = f"Couldn't get page content for '{new_record_star_name}'!"
                 log.add_update_result(msg)
                 prefix_print(f"{bcolors.FAIL}Error{bcolors.ENDC}: {msg} Skipping record...")
                 # Don't save record to local file if it fails to update...
-                set_record_not_to_save(new_rta_record)
-                set_record_not_to_save(new_ss_record)
+                if new_rta_record:
+                    set_rta_record_not_to_save(new_rta_record)
+                if new_ss_record:
+                    set_ss_record_not_to_save(new_ss_record)
                 continue
 
             BASE_TIMESTAMP  = response['query']['pages'][0]['revisions'][0]['timestamp']
@@ -160,13 +162,12 @@ def main():
             # to me ignoring the extensions sheet for now), 
             # so just skip ahead to the next record in the list
             if page_text == None:
-                # I did it like this because I wanted to
                 msg = f"Page '{new_record_star_name}' is either already updated or has a faster time than was provided!"
                 log.add_update_result(f'"{msg}"')
                 prefix_print(f"{msg} Skipping record...")
                 continue
 
-            sleep(1)
+            time.sleep(0.5)
 
             # Edit the current star's RTA Guide page with the new
             # updated page text containing the new record(s)
@@ -190,18 +191,26 @@ def main():
                 log.add_update_result(f"\"Failed to edit page 'RTA Guide/{new_record_star_name}'\"")
                 print(f'{bcolors.FAIL}Failed{bcolors.ENDC}')
                 # Don't save record to local file if it fails to update...
-                set_record_not_to_save(new_rta_record)
-                set_record_not_to_save(new_ss_record)
+                if new_rta_record:
+                    set_rta_record_not_to_save(new_rta_record)
+                if new_ss_record:
+                    set_ss_record_not_to_save(new_ss_record)
     except:
         # Don't save record to local file if it fails to update...
-        set_record_not_to_save(new_rta_record)
-        set_record_not_to_save(new_ss_record)
+        if new_rta_record:
+            set_rta_record_not_to_save(new_rta_record)
+        if new_ss_record:
+            set_ss_record_not_to_save(new_ss_record)
     finally:
         # Save records and output log
         # at the end of the session
         save_rta_records()
         save_ss_records()
+        # Log and print total execution time
+        exec_time = (time.time() - t1) / 60
+        log.set_execution_time(exec_time)
         log.out()
+        prefix_print(f'{bcolors.OKGREEN}Done{bcolors.ENDC}: took {exec_time:.2f}s')
 
 if __name__ == '__main__':
     main()
