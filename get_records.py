@@ -1,6 +1,5 @@
-from genericpath import exists
-import os.path
 import json
+import os
 import re
 
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -12,19 +11,15 @@ from ast import literal_eval
 
 from common import prefix_print, bcolors
 
-# If modifying these scopes, delete the file token.json.
+# Google Sheets API access scope (should be readonly)
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 
-TEST_SS_SHEET = '1mVSI74yhPZqOHm-2U-GkNeg1Dwck8tcdsmN_-niQeeI' # test sheet
-TEST_SS_SHEET_2 = '1cZbATGoMW_T-TQtLDZVNlbLiRcejiAizhA8ApkyTw4E' # test sheet w/ "new" wrs
+# Single Star Spreadsheet ID and column range
 SS_SHEET = '1_cOIEnuKIQ-3LA_U0ygpiL87PTSBPlHmKDId0vC7alo'
 SS_RANGE = 'Singlestar!B:E'
-
+# RTA Spreadsheet ID and column range
 RTA_SHEET = '1J20aivGnvLlAuyRIMMclIFUmrkHXUzgcDmYa31gdtCI'
 RTA_RANGE = ['Ultimate Star Spreadsheet v2!A:B']
-
-record_parse = re.compile(r'=HYPERLINK\("(?P<link>.+)?";"(?P<time>.+)"\)')
-row_label_parse = re.compile(r'\[(?P<strategy_index>\d)\]')
 
 # Current records list to be saved
 RECORDS_TO_SAVE = []
@@ -43,12 +38,13 @@ def get_creds() -> Credentials:
     Retrieve Google Sheets API Credentials, or renew
     them if necessary
     '''
+    global SCOPES
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
     # time.
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    if os.path.exists('.\\sheets_api\\token.json'):
+        creds = Credentials.from_authorized_user_file('.\\sheets_api\\token.json', SCOPES)
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         prefix_print('Updating Google Sheets API credentials...', end='')
@@ -56,10 +52,10 @@ def get_creds() -> Credentials:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+                '.\\sheets_api\\credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
         # Save the credentials for the next run
-        with open('token.json', 'w') as token:
+        with open('.\\sheets_api\\token.json', 'w') as token:
             token.write(creds.to_json())
         print(f'{bcolors.OKGREEN}Success{bcolors.ENDC}')
     return creds
@@ -123,6 +119,7 @@ def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
     star's information (time, link, name) into tuples, and
     returns a list containing said tuples
     '''
+    record_parse = re.compile(r'=HYPERLINK\("(?P<link>.+)?";"(?P<time>.+)"\)')
     records = []
     IGT_TEXT = ''
     last_star_name = ''
@@ -196,7 +193,7 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     a list of tuples that hold the new times, links, and
     star names
     '''
-    global RECORDS_TO_SAVE, RECORDS_NOT_TO_SAVE
+    global SS_SHEET, SS_RANGE, RECORDS_TO_SAVE, RECORDS_NOT_TO_SAVE
     try:
         if creds:
             service = build('sheets', 'v4', credentials=creds)
@@ -220,7 +217,7 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         elif creds == 'DEBUG':
             # For Debug / Testing
             cur_records = []
-            with open('test_ss_raw.txt', 'r') as file:
+            with open('.\\test_pages\\test_ss_raw.txt', 'r') as file:
                 for line in file:
                     cur_records.append(line)
             cur_records = parse_ss_values(cur_records)
@@ -234,7 +231,7 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
 
         # Save records if it's the first time running
         # or if the file somehow gets deleted
-        if not exists('.\\local_records\\last_saved_ss.txt'):
+        if not os.path.exists('.\\local_records\\last_saved_ss.txt'):
             save_ss_records()
 
     except HttpError as err:
@@ -260,6 +257,7 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
     star's information (time, link, name) into tuples, and
     returns a list containing said tuples
     '''
+    row_label_parse = re.compile(r'\[(?P<strategy_index>\d)\]')
     records = []
 
     prev_row = (f"{float('inf')}", '', '') # placeholder values
@@ -427,7 +425,7 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     a list of tuples that hold the new times, links, and
     row labels
     '''
-    global RECORDS_TO_SAVE, RECORDS_NOT_TO_SAVE
+    global RTA_SHEET, RTA_RANGE, RECORDS_TO_SAVE, RECORDS_NOT_TO_SAVE
     try:
         # TODO: have to get extensions sheet data as well...
         # otherwise faster times that exist on there will
@@ -443,8 +441,8 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
             service = build('sheets', 'v4', credentials=creds)
             sheet = service.spreadsheets()
             result = sheet.get(spreadsheetId=RTA_SHEET,
-                    ranges=RTA_RANGE,
-                    fields='sheets/data/rowData/values(userEnteredFormat/textFormat/bold,hyperlink,effectiveValue/stringValue)').execute() # monstrosity
+                     ranges=RTA_RANGE,
+                     fields='sheets/data/rowData/values(userEnteredFormat/textFormat/bold,hyperlink,effectiveValue/stringValue)').execute() # monstrosity
 
             if not result:
                 print('No data found in sheet')
@@ -461,7 +459,7 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         elif creds == 'DEBUG':
             # For Debug / Testing
             json_test_wrs = {}
-            with open('j2.json', 'r') as file:
+            with open('.\\test_pages\\j2.json', 'r') as file:
                 json_test_wrs = json.load(file)
                 cur_records = parse_rta_values(json_test_wrs)
         else:
@@ -474,7 +472,7 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
 
         # Save records if it's the first time running
         # or if the file somehow gets deleted
-        if not exists('.\\local_records\\last_saved_rta.txt'):
+        if not os.path.exists('.\\local_records\\last_saved_rta.txt'):
             save_rta_records()
 
     except HttpError as err:
