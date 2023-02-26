@@ -21,7 +21,8 @@ def main():
         new_rta_records = get_rta_records(SHEETS_CREDS)
         new_ss_records = get_ss_records(SHEETS_CREDS)
 
-        # Output log and stop execution if there are no new records to update
+        # Stop execution if there are errors retrieving data from
+        # either spreadsheet or there are no new records to update
         if new_rta_records == None:
             msg = 'Failed to retrieve data from RTA spreadsheet!'
             log.add_error_message(msg)
@@ -36,6 +37,7 @@ def main():
             log.set_nothing_to_update(True)
             prefix_print('No new single star or RTA records to update...')
             return
+        # TODO: does this info really need to be output?
         if new_rta_records == []:
             prefix_print('No new RTA records to update...')
         if new_ss_records == []:
@@ -128,6 +130,7 @@ def main():
             }
             response = json.loads(SESSION.get(url=API, params=req_params).text)
             page_text = response['query']['pages'][0]['revisions'][0]['slots']['main']['content']
+            # Handle failure to retrieve page text
             if not '{{speedrun_infobox' in page_text and not '{{speedrun_infobox_bowser_level' in page_text:
                 msg = f"Couldn't get page content for '{new_record_star_name}'!"
                 log.add_update_result(msg)
@@ -187,6 +190,7 @@ def main():
             if response['edit']['result'] == 'Success':
                 log.add_update_result('Success')
                 print(f'{bcolors.OKGREEN}Success{bcolors.ENDC}')
+            # Handle failure to edit page text
             else:
                 log.add_update_result(f"\"Failed to edit page 'RTA Guide/{new_record_star_name}'\"")
                 print(f'{bcolors.FAIL}Failed{bcolors.ENDC}')
@@ -195,19 +199,24 @@ def main():
                     set_rta_record_not_to_save(new_rta_record)
                 if new_ss_record:
                     set_ss_record_not_to_save(new_ss_record)
-    except:
+    except (Exception, KeyboardInterrupt) as e:
         # Don't save record to local file if it fails to update...
         if new_rta_record:
             set_rta_record_not_to_save(new_rta_record)
         if new_ss_record:
             set_ss_record_not_to_save(new_ss_record)
+        if type(e).__name__ != 'KeyboardInterrupt':
+            prefix_print(f'{bcolors.FAIL}Error{bcolors.ENDC}: {e} occured!')
+        else:
+            prefix_print(f'{bcolors.FAIL}Error{bcolors.ENDC}: {e} occured! Exiting...')
+            return
     finally:
         # Save records and output log
         # at the end of the session
         save_rta_records()
         save_ss_records()
         # Log and print total execution time
-        exec_time = (time.time() - t1) / 60
+        exec_time = (time.time() - t1)
         log.set_execution_time(exec_time)
         log.out()
         prefix_print(f'{bcolors.OKGREEN}Done{bcolors.ENDC}: took {exec_time:.2f}s')

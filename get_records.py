@@ -9,7 +9,7 @@ from googleapiclient.errors import HttpError
 from googleapiclient.discovery import build
 from ast import literal_eval
 
-from common import prefix_print, bcolors
+from common import prefix_print, remove_mins_place, bcolors
 
 # Google Sheets API access scope (should be readonly)
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
@@ -59,19 +59,6 @@ def get_creds() -> Credentials:
             token.write(creds.to_json())
         print(f'{bcolors.OKGREEN}Success{bcolors.ENDC}')
     return creds
-
-def remove_mins_place(record: str) -> float:
-    '''
-    Converts records longer than 1 minute 
-    from a X:XX.XX format to a XX.XX format
-    '''
-    record_list = record.split(':')
-    # Cast the array elements to floats
-    record_list = [float(i) for i in record_list]
-    # Convert the minutes place (record_list[0])
-    # into seconds, and add that 
-    # to the existing seconds place
-    return record_list[0]*60 + record_list[1]
 
 def get_new_records(local_records: list[tuple[str, str, str]], \
                     cur_records:   list[tuple[str, str, str]]) \
@@ -192,6 +179,7 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         if creds:
             service = build('sheets', 'v4', credentials=creds)
             sheet = service.spreadsheets()
+            # For each row in the specified column range, get the cell formula
             result = sheet.values().get(spreadsheetId=SS_SHEET,
                     range=SS_RANGE, valueRenderOption='FORMULA').execute()
             values = result.get('values', [])
@@ -363,6 +351,7 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
             records.remove(records[i])
             cur_star_name = records[i][2][4:]
 
+        # Remove 'JP' or 'US' from star name
         if 'JP' in cur_star_name or 'US' in cur_star_name:
             # Special case handling...
             if cur_star_name[:11] == 'BitS Battle':
@@ -443,6 +432,7 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         if creds:
             service = build('sheets', 'v4', credentials=creds)
             sheet = service.spreadsheets()
+            # For each row in the specified column range, get the following attributes: (boldness, hyperlink, displayed text)
             result = sheet.get(spreadsheetId=RTA_SHEET,
                      ranges=RTA_RANGE,
                      fields='sheets/data/rowData/values(userEnteredFormat/textFormat/bold,hyperlink,effectiveValue/stringValue)').execute() # monstrosity

@@ -1,6 +1,6 @@
 import re
 
-from get_records import remove_mins_place
+from common import remove_mins_place
 
 def replace_page_text(cur_page_text: str, parsed_records: str, \
                       cur_records: list[tuple[str, str]], \
@@ -66,15 +66,16 @@ def replace_page_text(cur_page_text: str, parsed_records: str, \
                 specifier_text = parsed_cur_record[1]
 
         if specifier_text:
+            # Best Available Video handling
             if len(specifier_text.split(' ')) > 1 and specifier_text.split(' ')[1] == 'Best':
                 # If the best time currently has no video
                 # and video and this new entry still isn't
                 # faster, just replace the video
-
                 if float(new_record[0]) > float(cur_record_time):
                     new_record = f'{new_record[0]} [{new_record[1]} ({specifier_text})]'
                 else:
                     new_record = f'[{new_record[1]} {new_record[0]}]'
+            # Other specifier text handling ('Course', 'with Red Coins', etc.)
             else:
                 cur_record_time = record_text_pattern.search(cur_record + ']').group(1)
                 if specifier_text == 'IGT':
@@ -83,7 +84,9 @@ def replace_page_text(cur_page_text: str, parsed_records: str, \
                     new_record = f'[{new_record[1]} {new_record[0]} ({specifier_text})]'
         else:
             new_record = f'[{new_record[1]} {new_record[0]}]'
+        # Handle IGT text out here bc idk i guess it's easier?
         igt_text = ' (IGT)' if specifier_text == 'IGT' else ''
+        # Make updated records list pretty
         edit_summary += str(cur_record_time) + igt_text + "' to '" + new_record_time + "', '"
         # Update parsed_records with the newly added record, so the next
         # iteration will be looking for the correct string in the page text,
