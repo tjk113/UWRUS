@@ -1,3 +1,4 @@
+import traceback
 import requests
 import json
 import time
@@ -20,6 +21,27 @@ def main():
         SHEETS_CREDS = get_creds()
         new_rta_records = get_rta_records(SHEETS_CREDS)
         new_ss_records = get_ss_records(SHEETS_CREDS)
+
+        # Make new records lists parallel (i.e. each separate
+        # star will have its own slot in both lists)
+        new_rta_record_names = [record[2] for record in new_rta_records]
+        new_ss_record_names = [record[2] for record in new_ss_records]
+        new_rta_records_tmp = []
+        new_ss_records_tmp = []
+        for new_record in new_rta_records:
+            if new_record[2] not in new_ss_record_names:
+                new_rta_records_tmp.append(None)
+            else:
+                new_rta_records_tmp.append(new_record)
+        new_rta_records = new_rta_records_tmp
+        for new_record in new_ss_records:
+            if new_record[2] not in new_rta_record_names:
+                new_ss_records_tmp.append(None)
+            else:
+                new_ss_records_tmp.append(new_record)
+        new_ss_records = new_ss_records_tmp
+
+        new_records = new_rta_records + new_ss_records
 
         # Stop execution if there are errors retrieving data from
         # either spreadsheet or there are no new records to update
@@ -89,7 +111,7 @@ def main():
             # Special case handling control variables
             is_bowser_course_record = False
             is_bowser_reds_record = False
-            is_first_100c_record = False
+            is_first_multi_100c_record = False
             is_second_multi_100c_record = False
 
             # Format bowser stage records appropriately and
@@ -104,7 +126,7 @@ def main():
             # Special case handling for multi-strategy 100c stars
             elif new_rta_record and '100' in new_record_star_name:
                 if 2 not in [i for i in new_rta_record]:
-                    is_first_100c_record = True
+                    is_first_multi_100c_record = True
                 else:
                     is_second_multi_100c_record = True
 
@@ -152,7 +174,7 @@ def main():
             elif is_bowser_reds_record:
                 page_text, summary = replace_record_bowser(page_text, new_rta_reds_record=new_rta_record, new_ss_reds_record=new_ss_record)
             # Multi-strategy 100c records handling...
-            elif is_first_100c_record:
+            elif is_first_multi_100c_record:
                 page_text, summary = replace_record_multi_100c(page_text, new_rta_100c_record_1=new_rta_record, new_ss_record=new_ss_record)
             elif is_second_multi_100c_record:
                 page_text, summary = replace_record_multi_100c(page_text, new_rta_100c_record_2=new_rta_record, new_ss_record=new_ss_record)
@@ -203,12 +225,16 @@ def main():
         # Don't save record to local file if it fails to update...
         if new_rta_record:
             set_rta_record_not_to_save(new_rta_record)
-        if new_ss_record:
+        else:
             set_ss_record_not_to_save(new_ss_record)
         if type(e).__name__ != 'KeyboardInterrupt':
-            prefix_print(f'{bcolors.FAIL}Error{bcolors.ENDC}: {e} occured!')
+            tb = traceback.format_exc()
+            print(tb)
+            # lineNumInd = tb.find('line ')
+            # tb
+            prefix_print(f'{bcolors.FAIL}Error{bcolors.ENDC}: {type(e).__name__} occurred!')
         else:
-            prefix_print(f'{bcolors.FAIL}Error{bcolors.ENDC}: {e} occured! Exiting...')
+            prefix_print(f'{bcolors.FAIL}Error{bcolors.ENDC}: {type(e).__name__} occurred! Exiting...')
             return
     finally:
         # Save records and output log

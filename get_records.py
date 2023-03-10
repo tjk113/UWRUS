@@ -208,7 +208,7 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
 
         # Set RECORDS_TO_SAVE, and
         # reset RECORDS_NOT_TO_SAVE
-        SS_RECORDS_TO_SAVE = cur_records
+        SS_RECORDS_TO_SAVE = cur_records.copy()
         SS_RECORDS_NOT_TO_SAVE = []
 
         # Save records if it's the first time running
@@ -350,6 +350,10 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
             # Doing this again because reasons...
             records.remove(records[i])
             cur_star_name = records[i][2][4:]
+        
+        # Plunder in the Sunken Ship special case handling...
+        if cur_star_name == 'Plunder in the Sunken Ship (Normal ending)':
+            cur_star_name = cur_star_name.replace(' (Normal ending)', '')
 
         # Remove 'JP' or 'US' from star name
         if 'JP' in cur_star_name or 'US' in cur_star_name:
@@ -460,7 +464,7 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
 
         # Set RECORDS_TO_SAVE, and
         # reset RECORDS_NOT_TO_SAVE
-        SS_RECORDS_TO_SAVE = cur_records
+        SS_RECORDS_TO_SAVE = cur_records.copy()
         SS_RECORDS_NOT_TO_SAVE = []
 
         # Save records if it's the first time running
@@ -497,11 +501,11 @@ def save_rta_records() -> None:
 # Test Driver Code
 if __name__ == '__main__':
     CREDS = get_creds()
-    new_records = get_rta_records(CREDS)
-    save_rta_records()
-    print('New records:')
-    for record in new_records:
-        print(record)
+    # new_records = get_rta_records(CREDS)
+    # save_rta_records()
+    # print('New records:')
+    # for record in new_records:
+    #     print(record)
     new_records = get_ss_records(CREDS)
     save_ss_records()
     print('New records:')
