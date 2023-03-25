@@ -5,90 +5,127 @@ import time
 
 from itertools import zip_longest
 
+from replace_record import replace_record, replace_record_bowser, replace_record_multi_100c
 from get_records import get_rta_records, save_rta_records,     \
                         get_ss_records, save_ss_records,       \
                         get_creds, set_rta_record_not_to_save, \
                         set_ss_record_not_to_save
-from replace_record import replace_record, replace_record_bowser, replace_record_multi_100c
 from common import prefix_print, bcolors
 from log import Log
 
-def main():
-    try:
-        t1 = time.time()
-        log = Log()
-        # Get new RTA and single star records from their respective spreadsheets
-        SHEETS_CREDS = get_creds()
-        new_rta_records = get_rta_records(SHEETS_CREDS)
-        new_ss_records = get_ss_records(SHEETS_CREDS)
+API = 'https://ukikipedia.net/mediawiki/api.php'
 
-        # Make new records lists parallel (i.e. each separate
-        # star will have its own slot in both lists)
-        new_rta_record_names = [record[2] for record in new_rta_records]
-        new_ss_record_names = [record[2] for record in new_ss_records]
-        new_rta_records_tmp = []
-        new_ss_records_tmp = []
-        for new_record in new_rta_records:
-            if new_record[2] not in new_ss_record_names:
-                new_rta_records_tmp.append(None)
-            else:
-                new_rta_records_tmp.append(new_record)
-        new_rta_records = new_rta_records_tmp
-        for new_record in new_ss_records:
-            if new_record[2] not in new_rta_record_names:
-                new_ss_records_tmp.append(None)
-            else:
-                new_ss_records_tmp.append(new_record)
-        new_ss_records = new_ss_records_tmp
-
-        new_records = new_rta_records + new_ss_records
-
-        # Stop execution if there are errors retrieving data from
-        # either spreadsheet or there are no new records to update
-        if new_rta_records == None:
-            msg = 'Failed to retrieve data from RTA spreadsheet!'
-            log.add_error_message(msg)
-            prefix_print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
-            return
-        if new_ss_records == None:
-            msg = 'Failed to retrieve data from single star spreadsheet!'
-            log.add_error_message(msg)
-            prefix_print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
-            return
-        if new_rta_records == [] and new_ss_records == []:
-            log.set_nothing_to_update(True)
-            prefix_print('No new single star or RTA records to update...')
-            return
-        # TODO: does this info really need to be output?
-        if new_rta_records == []:
-            prefix_print('No new RTA records to update...')
-        if new_ss_records == []:
-            prefix_print('No new single star records to update...')
-
-        # Get login token for Ukikipedia
-        BOT_USER = ''
-        BOT_PASS = ''
-        API = 'https://ukikipedia.net/mediawiki/api.php'
-        SESSION = requests.Session()
-        req_params = {
-            'action': 'query',
-            'meta'  : 'tokens',
-            'type'  : 'login',
-            'format': 'json'
-        }
-        prefix_print(f'Logging in to "{BOT_USER}"...', end='')
-        response = SESSION.get(url=API, params=req_params).json()
-        LOGIN_TOKEN = response['query']['tokens']['logintoken']
-
-        # Login to Ukikipedia
-        req_params = {
+def get_login_response(SESSION, BOT_USER, BOT_PASS) -> dict:
+    '''Try to log bot into Ukikipedia and return response'''
+    req_params = {
+        'action': 'query',
+        'meta'  : 'tokens',
+        'type'  : 'login',
+        'format': 'json'
+    }
+    prefix_print(f'Logging in to "{BOT_USER}"...', end='')
+    response = SESSION.get(url=API, params=req_params).json()
+    LOGIN_TOKEN = response['query']['tokens']['logintoken']
+    req_params = {
             'action'    : 'login',
             'lgname'    : BOT_USER,
             'lgpassword': BOT_PASS,
             'lgtoken'   : LOGIN_TOKEN,
             'format'    : 'json'
         }
-        response = SESSION.post(API, data=req_params).json()
+    return SESSION.post(API, data=req_params).json()
+
+def get_star_page_response(SESSION, star_name) -> tuple[str, str, str, str]:
+    '''Try to get a star's RTA Guide page text, and return response'''
+    req_params = {
+        'action'       : 'query',
+        'meta'         : 'tokens',
+        'titles'       : 'RTA Guide/' + star_name, # page name
+        'prop'         : 'revisions',
+        'rvslots'      : 'main',
+        'rvprop'       : 'content|timestamp',
+        'formatversion': 2,
+        'curtimestamp' : True,
+        'format'       : 'json'
+    }
+    response = json.loads(SESSION.get(url=API, params=req_params).text)
+
+    page_text = response['query']['pages'][0]['revisions'][0]['slots']['main']['content']
+    BASE_TIMESTAMP  = response['query']['pages'][0]['revisions'][0]['timestamp']
+    START_TIMESTAMP = response['curtimestamp']
+    CSRF_TOKEN = response['query']['tokens']['csrftoken']
+
+    return page_text, BASE_TIMESTAMP, START_TIMESTAMP, CSRF_TOKEN
+
+def get_edit_star_page_response(SESSION, star_name, page_text, summary, \
+                                CSRF_TOKEN, BASE_TIMESTAMP, START_TIMESTAMP):
+    '''Edit a star's RTA Guide page with the new
+    updated page text containing the new record(s)'''
+    req_params = {
+        'action'        : 'edit',
+        'title'         : 'RTA Guide/' + star_name,
+        'token'         : CSRF_TOKEN,
+        'basetimestamp' : BASE_TIMESTAMP,
+        'starttimestamp': START_TIMESTAMP,
+        'bot'           : True,
+        'text'          : page_text,
+        'summary'       : summary,
+        'format'        : 'json'
+    }
+    prefix_print(f'Editing page "RTA Guide/{star_name}"...', end='')
+    return SESSION.post(API, data=req_params).json()
+
+def main():
+    t1 = time.time()
+    log = Log()
+    # Get new RTA and single star records from their respective spreadsheets
+    SHEETS_CREDS = get_creds()
+    new_rta_records = get_rta_records(SHEETS_CREDS)
+    new_ss_records = get_ss_records(SHEETS_CREDS)
+
+    # Stop execution if there are errors retrieving data from
+    # either spreadsheet or there are no new records to update
+    if new_rta_records == None:
+        msg = 'Failed to retrieve data from RTA spreadsheet!'
+        log.add_error_message(msg)
+        prefix_print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
+        return
+    if new_ss_records == None:
+        msg = 'Failed to retrieve data from single star spreadsheet!'
+        log.add_error_message(msg)
+        prefix_print(f'{bcolors.FAIL}Error:{bcolors.ENDC} {msg}')
+        return
+    if new_rta_records == [] and new_ss_records == []:
+        log.set_nothing_to_update(True)
+        prefix_print('No new single star or RTA records to update...')
+        return
+    # TODO: does this info really need to be output?
+    if new_rta_records == []:
+        prefix_print('No new RTA records to update...')
+    if new_ss_records == []:
+        prefix_print('No new single star records to update...')
+
+    # Make new records lists parallel (i.e. each
+    # star will have its own entry in both lists)
+    for i, new_record in enumerate(new_rta_records[:]):
+        if new_record:
+            # Check if the name of the current RTA record
+            # is also present in the SS records list
+            if new_record[2] not in [record[2] for record in set(new_ss_records)]:
+                new_ss_records.insert(i, None)
+    for i, new_record in enumerate(new_ss_records[:]):
+        if new_record:
+            # Check if the name of the current SS record
+            # is also present in the RTA records list
+            if new_record[2] not in [record[2] for record in set(new_rta_records)]:
+                new_rta_records.insert(i, None)
+
+    try:
+        SESSION = requests.Session()
+        # Login to Ukikipedia
+        BOT_USER = ''
+        BOT_PASS = ''
+        response = get_login_response(SESSION, BOT_USER, BOT_PASS)
         if response['login']['result'] == 'Success':
             print(f'{bcolors.OKGREEN}Success{bcolors.ENDC}')
         else:
@@ -138,20 +175,10 @@ def main():
             else:
                 log.add_star_name(new_record_star_name, ('RTA' if new_rta_record != None else 'SS'))
 
-            # Get current star's RTA Guide page text
-            req_params = {
-                'action'       : 'query',
-                'meta'         : 'tokens',
-                'titles'       : 'RTA Guide/' + new_record_star_name, # page name
-                'prop'         : 'revisions',
-                'rvslots'      : 'main',
-                'rvprop'       : 'content|timestamp',
-                'formatversion': 2,
-                'curtimestamp' : True,
-                'format'       : 'json'
-            }
-            response = json.loads(SESSION.get(url=API, params=req_params).text)
-            page_text = response['query']['pages'][0]['revisions'][0]['slots']['main']['content']
+            # Get current star's RTA Guide page text and some other
+            # necessary parameters needed to edit the page
+            page_text, BASE_TIMESTAMP, START_TIMESTAMP, CSRF_TOKEN = \
+                get_star_page_response(SESSION, new_record_star_name)
             # Handle failure to retrieve page text
             if not '{{speedrun_infobox' in page_text and not '{{speedrun_infobox_bowser_level' in page_text:
                 msg = f"Couldn't get page content for '{new_record_star_name}'!"
@@ -163,10 +190,6 @@ def main():
                 if new_ss_record:
                     set_ss_record_not_to_save(new_ss_record)
                 continue
-
-            BASE_TIMESTAMP  = response['query']['pages'][0]['revisions'][0]['timestamp']
-            START_TIMESTAMP = response['curtimestamp']
-            CSRF_TOKEN = response['query']['tokens']['csrftoken']
 
             # Bowser stage records handling...
             if is_bowser_course_record:
@@ -187,28 +210,15 @@ def main():
             # to me ignoring the extensions sheet for now), 
             # so just skip ahead to the next record in the list
             if page_text == None:
-                msg = f"Page '{new_record_star_name}' is either already updated or has a faster time than was provided!"
+                msg = f"Page 'RTA Guide/{new_record_star_name}' is either already updated or has a faster time than was provided!"
                 log.add_update_result(f'"{msg}"')
                 prefix_print(f"{msg} Skipping record...")
                 continue
 
             time.sleep(0.5)
 
-            # Edit the current star's RTA Guide page with the new
-            # updated page text containing the new record(s)
-            req_params = {
-                'action'        : 'edit',
-                'title'         : 'RTA Guide/' + new_record_star_name,
-                'token'         : CSRF_TOKEN,
-                'basetimestamp' : BASE_TIMESTAMP,
-                'starttimestamp': START_TIMESTAMP,
-                'bot'           : True,
-                'text'          : page_text,
-                'summary'       : summary,
-                'format'        : 'json'
-            }
-            prefix_print(f'Editing page "RTA Guide/{new_record_star_name}"...', end='')
-            response = SESSION.post(API, data=req_params).json()
+            response = get_edit_star_page_response(SESSION, new_record_star_name, page_text, summary, \
+                                                   CSRF_TOKEN, BASE_TIMESTAMP, START_TIMESTAMP)
             if response['edit']['result'] == 'Success':
                 log.add_update_result('Success')
                 print(f'{bcolors.OKGREEN}Success{bcolors.ENDC}')
@@ -221,21 +231,18 @@ def main():
                     set_rta_record_not_to_save(new_rta_record)
                 if new_ss_record:
                     set_ss_record_not_to_save(new_ss_record)
+
     except (Exception, KeyboardInterrupt) as e:
         # Don't save record to local file if it fails to update...
         if new_rta_record:
             set_rta_record_not_to_save(new_rta_record)
         else:
             set_ss_record_not_to_save(new_ss_record)
+        # Don't print traceback for KeyboardInterrupt
         if type(e).__name__ != 'KeyboardInterrupt':
-            tb = traceback.format_exc()
-            print(tb)
-            # lineNumInd = tb.find('line ')
-            # tb
-            prefix_print(f'{bcolors.FAIL}Error{bcolors.ENDC}: {type(e).__name__} occurred!')
-        else:
-            prefix_print(f'{bcolors.FAIL}Error{bcolors.ENDC}: {type(e).__name__} occurred! Exiting...')
-            return
+            print(traceback.format_exc())
+        prefix_print(f'{bcolors.FAIL}Error{bcolors.ENDC}: {type(e).__name__} occurred! Exiting...')
+        return
     finally:
         # Save records and output log
         # at the end of the session

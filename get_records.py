@@ -106,33 +106,44 @@ def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
     last_star_name = ''
     for i in range(len(values)):
         try:
+            cur_is_igt = values[i][1] == 'Best IGT' and values[i][2] == '---'
+            rt_igt_tied = False
+
             # Check if next row is an IGT record.
             # If so, then skip ahead to that
-            cur_is_igt = values[i][0] == '' and values[i][2] == '---'
-            rt_igt_tied = False
+            has_igt = False
+            j = 0
+            try:
+                # Emulating a do while loop (the loop can
+                # go to the end of the current stage)
+                while values[i+j]:
+                    # This assumes every record has a real-time run... probably safe
+                    if values[i+j][1] == 'Best IGT' and values[i+j][2] == '---' and j != 0:
+                        has_igt = True
+                        break
+                    if values[i+j+1][0]:
+                        break
+                    j += 1
             # If the next_is_igt check fails with an IndexError,
             # then the next row is a separator row, and we should
             # disregard this IndexError so that we don't skip over
             # the last star row of each stage
-            next_is_igt = None
-            try:
-                next_is_igt = values[i+1][0] == '' and values[i+1][2] == '---'
             except IndexError:
                 next_is_separator = True
 
-            if cur_is_igt and next_is_igt:
+            if cur_is_igt and has_igt:
                 continue
-            if next_is_igt:
+            if has_igt:
                 # Prioritize first real-time record if there are
                 # tied IGT record(s) or tied real-time record(s)
                 cur_igt = values[i][3].replace('"', '.').replace("'", ':')
                 # Pretty much just to handle Snowman's Lost His Head
                 # (and maybe In the Deep Freeze)
                 try:
-                    next_igt = record_parse.search(values[i+1][3]).group('time') \
+                    next_igt = record_parse.search(values[i+j][3]).group('time') \
                                .replace('""', '.').replace("'", ':')
                 except AttributeError:
-                    next_igt = values[i+1][3].replace('"', '.').replace("'", ':')
+                    next_igt = values[i+1j][3].replace('"', '.').replace("'", ':')
 
                 if ':' in cur_igt:
                     cur_igt = remove_mins_place(cur_igt)
@@ -144,7 +155,7 @@ def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
                 else:
                     IGT_TEXT = ' (IGT)'
                     continue
-            if not next_is_igt or rt_igt_tied or next_is_separator:
+            if not has_igt or rt_igt_tied or next_is_separator:
                 res = record_parse.search(values[i][2])
             if cur_is_igt and not rt_igt_tied:
                 res = record_parse.search(values[i][3])
@@ -154,9 +165,19 @@ def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
 
             # Check if video link is already in records
             if link not in [i[1] for i in records]:
-                # If the star name is blank and it's an IGT record,
-                # then use the star name from the previous row
-                star_name = values[i][0] if values[i][0] else values[i-1][0]
+                if values[i][0]:
+                    star_name = values[i][0]
+                else:
+                    # Iterate back up the list
+                    # until we find the star name
+                    # (This is for stars that have
+                    # multiple tied real-time records
+                    # and/or IGT records)
+                    j = 1
+                    while not values[i-j][0]:
+                        j += 1
+                    star_name = values[i-j][0]
+
                 if star_name and star_name != last_star_name:
                     records.append((time + IGT_TEXT, link, star_name))
                 last_star_name = star_name
@@ -181,7 +202,7 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
             sheet = service.spreadsheets()
             # For each row in the specified column range, get the cell formula
             result = sheet.values().get(spreadsheetId=SS_SHEET,
-                    range=SS_RANGE, valueRenderOption='FORMULA').execute()
+                     range=SS_RANGE, valueRenderOption='FORMULA').execute()
             values = result.get('values', [])
 
             if not values:
