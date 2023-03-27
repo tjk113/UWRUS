@@ -99,26 +99,26 @@ def main():
         log.set_nothing_to_update(True)
         prefix_print('No new single star or RTA records to update...')
         return
-    # TODO: does this info really need to be output?
-    if new_rta_records == []:
-        prefix_print('No new RTA records to update...')
-    if new_ss_records == []:
-        prefix_print('No new single star records to update...')
-
     # Make new records lists parallel (i.e. each
     # star will have its own entry in both lists)
-    for i, new_record in enumerate(new_rta_records[:]):
-        if new_record:
-            # Check if the name of the current RTA record
-            # is also present in the SS records list
-            if new_record[2] not in [record[2] for record in set(new_ss_records)]:
-                new_ss_records.insert(i, None)
-    for i, new_record in enumerate(new_ss_records[:]):
-        if new_record:
-            # Check if the name of the current SS record
-            # is also present in the RTA records list
-            if new_record[2] not in [record[2] for record in set(new_rta_records)]:
-                new_rta_records.insert(i, None)
+    if new_rta_records == []:
+        prefix_print('No new RTA records to update...')
+    else:
+        for i, new_record in enumerate(new_rta_records[:]):
+            if new_record:
+                # Check if the name of the current RTA record
+                # is also present in the SS records list
+                if new_record[2] not in [record[2] for record in set(new_ss_records) if record]:
+                    new_ss_records.insert(i, None)
+    if new_ss_records == []:
+        prefix_print('No new single star records to update...')
+    else:
+        for i, new_record in enumerate(new_ss_records[:]):
+            if new_record:
+                # Check if the name of the current SS record
+                # is also present in the RTA records list
+                if new_record[2] not in [record[2] for record in set(new_rta_records) if record]:
+                    new_rta_records.insert(i, None)
 
     try:
         SESSION = requests.Session()
