@@ -70,28 +70,36 @@ def get_new_records(local_records: list[tuple[str, str, str]], \
     # Remove everything from local_records except the new records
     # (Iterate over copies of lists so that we can delete items
     # from the actual lists while iterating)
-    for local_record, cur_record in zip(local_records[:], cur_records[:]):
-        temp_time = local_record[0]
-        temp_time_2 = cur_record[0]
+    local_records_cpy = local_records.copy()
+    cur_records_cpy = cur_records.copy()
+    for local_record, cur_record in zip(local_records_cpy, cur_records_cpy):
+        local_time = local_record[0]
+        cur_time = cur_record[0]
 
         if 'IGT' in local_record[0]:
-            temp_time = local_record[0][:-6]
+            local_time = local_record[0][:-6]
         if 'IGT' in cur_record[0]:
-            temp_time_2 = cur_record[0][:-6]
+            cur_time = cur_record[0][:-6]
 
         if ":" in local_record[0]:
-            temp_time = remove_mins_place(temp_time)
+            local_time = remove_mins_place(local_time)
         if ":" in cur_record[0]:
-            temp_time_2 = remove_mins_place(temp_time_2)
+            cur_time = remove_mins_place(cur_time)
 
-        if local_record == cur_record:
+        # If the wr is unchanged or the wr pulled from the sheet
+        # is slower than the local wr, then remove the record
+        if local_record == cur_record or float(cur_time) > float(local_time):
             local_records.remove(local_record)
             cur_records.remove(cur_record)
-        # If the new wr is faster or if there's a
-        # new video link, then update the record
-        elif float(temp_time) > float(temp_time_2) or \
-             str(temp_time)[1] != str(temp_time_2)[1]:
-                 local_record = cur_record
+        # If there's a new video link, then update the record
+        elif local_record[1] != cur_record[1]:
+            # There should never ever be special case
+            # handling in this function! That being said...
+            if local_record[2] == 'RR 100 Coins':
+                local_records.remove(local_record)
+                cur_records.remove(cur_record)
+                continue
+            cur_records[cur_records.index(cur_record)] = (local_record[0], cur_record[1], local_record[2])
     return cur_records
 
 def parse_ss_values(values: list[str]) -> list[tuple[str, str, str]]:
@@ -227,11 +235,6 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         else:
             return
 
-        # Set RECORDS_TO_SAVE, and
-        # reset RECORDS_NOT_TO_SAVE
-        SS_RECORDS_TO_SAVE = cur_records.copy()
-        SS_RECORDS_NOT_TO_SAVE = []
-
         # Save records if it's the first time running
         # or if the file somehow gets deleted
         if not os.path.exists('.\\local_records\\last_saved_ss.txt'):
@@ -242,6 +245,10 @@ def get_ss_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         return
 
     new_records = get_new_records(local_records, cur_records)
+    # Set RECORDS_TO_SAVE, and
+    # reset RECORDS_NOT_TO_SAVE
+    SS_RECORDS_TO_SAVE = cur_records.copy()
+    SS_RECORDS_NOT_TO_SAVE = []
     return new_records
 
 def set_ss_record_not_to_save(record: tuple[str, str, str]) -> None:
@@ -258,9 +265,20 @@ def save_ss_records() -> None:
     '''
     global SS_RECORDS_TO_SAVE, SS_RECORDS_NOT_TO_SAVE
     if SS_RECORDS_TO_SAVE:
+        records_to_save = [i for i in SS_RECORDS_TO_SAVE if i not in SS_RECORDS_NOT_TO_SAVE]
+        local_records = []
         with open('.\\local_records\\last_saved_ss.txt', 'w+') as file:
-            # Only save records that aren't in RECORDS_NOT_TO_SAVE
-            for record in [i for i in SS_RECORDS_TO_SAVE if i not in SS_RECORDS_NOT_TO_SAVE]:
+            # Load local records into list
+            for line in file:
+                local_records.append(literal_eval(line.strip('\n')))
+            # "Find and replace" local records with new records
+            for i, local_record in enumerate(local_records):
+                for new_record in records_to_save:
+                    if new_record[2] == local_record[2]:
+                        local_records[i] = new_record
+            # Write updated local records to file
+            file.seek(0)
+            for record in records_to_save:
                 file.write(str(record)+'\n')
 
 def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
@@ -425,10 +443,15 @@ def parse_rta_values(values: dict) -> list[tuple[str, str, str]]:
                     cur_star_name = 'TTC 100 Coins'
                 case 'The Big House in the Sky + 100c':
                     cur_star_name = 'RR 100 Coins'
-        # If cur_star_name is already in records, append a 2 to the end
-        # of the tuple (this is to distinguish between multi-strategy
-        # 100c stars)
-        if cur_star_name in [j[2] for j in records]:
+
+        # If cur_star_name is already in records, append a 1 and a 2 to the
+        # end of the tuples of the respective records (this is to distinguish
+        # between multi-strategy 100c stars)
+        for j, record in enumerate(records):
+            # Special case handling...
+            if record[2] == cur_star_name and cur_star_name != 'Through the Jet Stream':
+                records[j] = (record[0], record[1], record[2], 1)
+        if cur_star_name in [j[2] for j in records] and cur_star_name != 'Through the Jet Stream':
             parsed_record = (records[i][0], records[i][1], cur_star_name, 2)
         else:
             parsed_record = (records[i][0], records[i][1], cur_star_name)
@@ -442,7 +465,7 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
     a list of tuples that hold the new times, links, and
     row labels
     '''
-    global RTA_SHEET, RTA_RANGE, SS_RECORDS_TO_SAVE, SS_RECORDS_NOT_TO_SAVE
+    global RTA_SHEET, RTA_RANGE, RTA_RECORDS_TO_SAVE, RTA_RECORDS_NOT_TO_SAVE
     try:
         # TODO: have to get extensions sheet data as well...
         # otherwise faster times that exist on there will
@@ -483,11 +506,6 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         else:
             return
 
-        # Set RECORDS_TO_SAVE, and
-        # reset RECORDS_NOT_TO_SAVE
-        SS_RECORDS_TO_SAVE = cur_records.copy()
-        SS_RECORDS_NOT_TO_SAVE = []
-
         # Save records if it's the first time running
         # or if the file somehow gets deleted
         if not os.path.exists('.\\local_records\\last_saved_rta.txt'):
@@ -498,6 +516,10 @@ def get_rta_records(creds: Credentials = None) -> list[tuple[str, str, str]]:
         return
 
     new_records = get_new_records(local_records, cur_records)
+    # Set RECORDS_TO_SAVE, and
+    # reset RECORDS_NOT_TO_SAVE
+    RTA_RECORDS_TO_SAVE = cur_records.copy()
+    RTA_RECORDS_NOT_TO_SAVE = []
     return new_records
 
 def set_rta_record_not_to_save(record: tuple[str, str, str]) -> None:
@@ -514,21 +536,32 @@ def save_rta_records() -> None:
     '''
     global RTA_RECORDS_TO_SAVE, RTA_RECORDS_NOT_TO_SAVE
     if RTA_RECORDS_TO_SAVE:
-        with open('.\\local_records\\last_saved_rta.txt', 'w+') as file:
-            # Only save records that aren't in RECORDS_NOT_TO_SAVE
-            for record in [i for i in RTA_RECORDS_TO_SAVE if i not in RTA_RECORDS_NOT_TO_SAVE]:
+        records_to_save = [i for i in RTA_RECORDS_TO_SAVE if i not in RTA_RECORDS_NOT_TO_SAVE]
+        local_records = []
+        with open('.\\local_records\\last_saved_rta.txt', 'r+') as file:
+            # Load local records into list
+            for line in file:
+                local_records.append(literal_eval(line.strip('\n')))
+            # "Find and replace" local records with new records
+            for i, local_record in enumerate(local_records):
+                for new_record in records_to_save:
+                    if new_record[2] == local_record[2]:
+                        local_records[i] = new_record
+            # Write updated local records to file
+            file.seek(0)
+            for record in local_records:
                 file.write(str(record)+'\n')
 
 # Test Driver Code
 if __name__ == '__main__':
     CREDS = get_creds()
-    # new_records = get_rta_records(CREDS)
-    # save_rta_records()
+    new_records = get_rta_records(CREDS)
+    save_rta_records()
     # print('New records:')
     # for record in new_records:
     #     print(record)
-    new_records = get_ss_records(CREDS)
-    save_ss_records()
-    print('New records:')
-    for record in new_records:
-        print(record)
+    # new_records = get_ss_records(CREDS)
+    # save_ss_records()
+    # print('New records:')
+    # for record in new_records:
+    #     print(record)

@@ -162,9 +162,9 @@ def main():
                     is_bowser_reds_record = True
             # Special case handling for multi-strategy 100c stars
             elif new_rta_record and '100' in new_record_star_name:
-                if 2 not in [i for i in new_rta_record]:
+                if 1 in [i for i in new_rta_record]:
                     is_first_multi_100c_record = True
-                else:
+                elif 2 in [i for i in new_rta_record]:
                     is_second_multi_100c_record = True
 
             # If the current star is the second record for a

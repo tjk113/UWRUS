@@ -39,6 +39,10 @@ def replace_page_text(cur_page_text: str, parsed_records: str, \
         if ':' in cur_record_time:
             cur_record_time = remove_mins_place(cur_record_time)
         cur_record_time = float(cur_record_time)
+        # TODO: modify the record_text_pattern regex to be
+        # able to also capture the link of the current records
+        # so that we can update the local records if a the page
+        # has a faster time than the "new" record being provided
         if new_record_time > cur_record_time:
             return (None, None)
 
@@ -178,7 +182,7 @@ def replace_record_multi_100c(cur_page_text: str, new_rta_100c_record_1:  tuple[
 
 # Test Driver Code
 if __name__ == '__main__':
-    page_text = 'bowser'
+    page_text = 'bav'
     page_text_cpy = page_text
 
     if page_text == 'bowser':
@@ -193,7 +197,12 @@ if __name__ == '__main__':
                 page_text += line
     elif page_text == 'reg':
         page_text = ''
-        with open('test_page.txt', 'r') as file:
+        with open('test_page_2.txt', 'r') as file:
+            for line in file:
+                page_text += line
+    elif page_text == 'bav':
+        page_text = ''
+        with open('test_page_best_available_vid.txt', 'r') as file:
             for line in file:
                 page_text += line
 
@@ -214,6 +223,11 @@ if __name__ == '__main__':
             #                     new_throw_record=new_bowser_throw_wr)
         new_text, edit_summary = replace_record_bowser(page_text, new_throw_record=new_bowser_throw_wr)
     elif page_text_cpy == 'reg':
+        new_rta_wr = ('17.40', 'https://www.youtube.com/watch?v=W72cyc5sESo')
+        # new_rta_wr = None
+        new_ss_wr = ('8.20', 'https://www.youtube.com/watch?v=84r1NnU5WRc')
+        new_text, edit_summary = replace_record(page_text, new_rta_record=new_rta_wr, new_ss_record=new_ss_wr)
+    elif page_text_cpy == 'bav':
         new_rta_wr = ('17.40', 'https://www.youtube.com/watch?v=W72cyc5sESo')
         # new_rta_wr = None
         new_ss_wr = ('8.20', 'https://www.youtube.com/watch?v=84r1NnU5WRc')
