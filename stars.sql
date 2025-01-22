@@ -76,7 +76,7 @@ VALUES
 (11,4,'Express Elevator--Hurry Up!'),
 (11,5,'Go to Town for Red Coins'),
 (11,6,'Quick Race Through Downtown!'),
-(11,7,'WDW 100 Coins: With Secrets / With Reds'),
+(11,7,'WDW 100 Coins'),
 (12,1,'Scale the Mountain'),
 (12,2,'Mystery of the Monkey Cage'),
 (12,3,'Scary ''Shrooms, Red Coins'),
