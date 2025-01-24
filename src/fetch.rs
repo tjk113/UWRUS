@@ -4,7 +4,7 @@ use reqwest;
 use std::fs;
 
 use crate::record::Record;
-use crate::star_time;
+use crate::times;
 
 const SINGLE_STAR_RECORDS_URL: &str = "https://singlestar.sm64rta.info/singlestar/";
 
@@ -136,7 +136,7 @@ pub fn single_star_records() -> reqwest::Result<Vec<Record>> {
                     }
                 },
                 2 => {
-                    cur_record.time = star_time::format(
+                    cur_record.time = times::format(
                         fields["text"].to_string().as_str()
                     );
 

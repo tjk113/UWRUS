@@ -3,7 +3,7 @@ use std::cmp;
 use rusqlite::{Connection, Result, params};
 
 use crate::record::Record;
-use crate::star_time;
+use crate::times;
 
 pub const PATH: &str = "./records.db";
 
@@ -91,7 +91,7 @@ pub fn get_new_records(con: &mut Connection, fetched_records: &Vec<Record>, tabl
                 && (x.star as i64) == star
         ).unwrap()].clone();
 
-        let should_update = match star_time::compare(fetched_record.time.as_str(), time).unwrap() {
+        let should_update = match times::compare(fetched_record.time.as_str(), time).unwrap() {
             cmp::Ordering::Less => true,
             _ => false
         } || fetched_record.video_link != video_link;

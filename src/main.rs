@@ -6,8 +6,8 @@ mod record;
 mod fetch;
 /// Functions for interacting with the records database.
 mod database;
-/// Functions for operating on star_time, as formatted by the single star and RTA record pages.
-mod star_time;
+/// Functions for operating on times, as formatted by the single star and RTA record pages.
+mod times;
 /// Functions for editing page text to be uploaded to the wiki.
 mod text;
 
@@ -77,9 +77,9 @@ fn main() -> Result<()> {
     //     ("titles"       , page_titles_str.as_str()),
     //     ("prop"         , "revisions"),
     //     ("rvslots"      , "main"),
-    //     ("rvprop"       , "content|star_timetamp"),
+    //     ("rvprop"       , "content|timestamp"),
     //     ("formatversion", "2"),
-    //     ("curstar_timetamp" , "true"),
+    //     ("curtimestamp" , "true"),
     //     ("format"       , "json")
     // ]);
 

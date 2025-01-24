@@ -3,7 +3,7 @@ use std::{any::Any, convert::{TryFrom, TryInto}, intrinsics::type_id};
 use regex;
 
 use crate::record::Record;
-use crate::star_time;
+use crate::times;
 
 #[derive(Debug)]
 pub enum UpdateError {
@@ -78,8 +78,8 @@ impl InfoboxFormat {
                     // Check that the new record is less than or equal to the
                     // current first record, and less than teh current second
                     // record.
-                    let first_comparison = star_time::compare(&new_record.time, first_time).unwrap();
-                    let second_comparison = star_time::compare(&new_record.time, second_time).unwrap();
+                    let first_comparison = times::compare(&new_record.time, first_time).unwrap();
+                    let second_comparison = times::compare(&new_record.time, second_time).unwrap();
                     if first_comparison.is_le() && second_comparison.is_lt() {
                         1
                     }
@@ -111,7 +111,7 @@ impl InfoboxFormat {
 
     fn add_to_summary(summary: &str, old_time: &str, new_time: &str) -> String {
         let mut owned = summary.to_owned();
-        // If one or more star_time are present in the
+        // If one or more times are present in the
         // summary, then append a comma.
         // TODO: Figure out a way to un-jankify this.
         if owned.len() > "Updated WRs: ".len() + 2 {
@@ -148,7 +148,7 @@ impl InfoboxFormat {
             let (cur_link, cur_time) = wiki_link_to_parts(cur_record);
             // This comparison is `.is_le()` so that links can
             // be updated even when a time hasn't been improved.
-            if star_time::compare(new_record.time.as_str(), cur_time).unwrap().is_le() {
+            if times::compare(new_record.time.as_str(), cur_time).unwrap().is_le() {
                 new_page_text = new_page_text.replacen(cur_time, &new_record.time, 1);
                 new_page_text = new_page_text.replacen(cur_link, &new_record.video_link, 1);
                 summary = InfoboxFormat::add_to_summary(&mut summary, cur_time, &new_record.time);
@@ -162,7 +162,7 @@ impl InfoboxFormat {
     // we need to use it, but this can be
     // rethought later!
     // NOTE: These regex patterns will capture the [brackets]
-    // around each record link. This is because somestar_time the
+    // around each record link. This is because sometimes the
     // record text will not start with a link (namely, stars
     // for which no RTA strategy exists, such as Find the 8
     // Red Coins in Bob-omb Battlefield).
