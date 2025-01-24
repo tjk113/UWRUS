@@ -34,6 +34,8 @@ impl TryFrom<usize> for InfoboxFormat {
     }
 }
 
+/// Create a tuple of the form `(<link>, <time>)` from a
+/// wiki-formatted link of the form `[<link> <time + extra text>]`.
 fn wiki_link_to_parts(link: &str) -> (&str, &str) {
     let split: Vec<_> = link.splitn(3, ' ').collect();
     (split[0].trim_start_matches('['), split[1].trim_end_matches(']'))
