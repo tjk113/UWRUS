@@ -93,7 +93,7 @@ fn adjust_course_num_for_database(record: &mut Record) {
 
 pub fn single_star_records() -> reqwest::Result<Vec<Record>> {
     // For testing purposes:
-    let html = fs::read_to_string("new.html").unwrap();
+    let html = fs::read_to_string("dev_resources/new_ss.html").unwrap();
     // let html = reqwest::blocking::get(SINGLE_STAR_RECORDS_URL)?.text()?;
 
     let cell_pattern = Regex::new(r#"<td( class="small")?>((<a href="(?<link>.+)">)|(<i class=.+"><span .+oon">)|(<img src="/img/flag/(?<region>us|jp|eu)\.png".+t">))?(?<text>[^<]*)"#).unwrap();
