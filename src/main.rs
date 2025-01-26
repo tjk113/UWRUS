@@ -35,7 +35,7 @@ fn main() -> Result<()> {
     // database::update_records(&mut con, &new_ss_records, database::RecordsTable::SingleStar)?;
 
     // TODO: fetch record pages...
-    let page_text = fs::read_to_string("dev_resources/blastAwayTheWall.txt").unwrap();
+    // let page_text = fs::read_to_string("dev_resources/blastAwayTheWall.txt").unwrap();
 
     // let record_ind = new_ss_records.iter().position(|record| {
     //     record.course == 18 && record.star == 1
@@ -43,28 +43,43 @@ fn main() -> Result<()> {
     // let record = new_ss_records[record_ind].clone();
 
     // Fake records for testing purposes:
-    let record = record::Record {
-        course: 2,
-        star: 6,
-        with_100_coins: false,
-        page_name: String::from("Blast Away the Wall"),
-        time: String::from("6.00"),
-        is_rta: false,
-        video_link: String::from("test.com"),
-        video_time: None
-    };
-    let record2 = record::Record {
-        course: 2,
-        star: 6,
-        with_100_coins: false,
-        page_name: String::from("Blast Away the Wall"),
-        time: String::from("5.97"),
-        is_rta: true,
-        video_link: String::from("test.com"),
-        video_time: None
+    // let record = record::Record {
+    //     course: 2,
+    //     star: 6,
+    //     with_100_coins: false,
+    //     page_name: String::from("Blast Away the Wall"),
+    //     time: String::from("6.00"),
+    //     is_rta: false,
+    //     video_link: String::from("test.com"),
+    //     video_time: None
+    // };
+    // let record2 = record::Record {
+    //     course: 2,
+    //     star: 6,
+    //     with_100_coins: false,
+    //     page_name: String::from("Blast Away the Wall"),
+    //     time: String::from("5.97"),
+    //     is_rta: true,
+    //     video_link: String::from("test.com"),
+    //     video_time: None
+    // };
+
+    // println!("{:?}", text::InfoboxFormat::Standard.update(&page_text, &[record, record2]));
+
+    // Why doesn't the google_sheetsv4 crate offer a synchronous API...
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let rta_records = match runtime.block_on(fetch::rta_records()) {
+        Ok(records) => records,
+        Err(_) => {
+            Vec::default()
+            // eprintln!("{:?}", e);
+            // return Err();
+        }
     };
 
-    println!("{:?}", text::InfoboxFormat::Standard.update(&page_text, &[record, record2]));
+    for record in rta_records {
+        println!("{:#?}", record);
+    }
 
     // let page_titles: Vec<_> = vec!["Bowser in the Sky", "CCM 100 Coins"]
     //     .iter()

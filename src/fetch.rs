@@ -1,12 +1,47 @@
-use regex::Regex;
-use reqwest;
-
 use std::fs;
+
+use google_sheets4 as sheets4;
+use sheets4::{Sheets, hyper_rustls, hyper_util, yup_oauth2};
+use hyper_util::client::legacy::connect::HttpConnector;
+use hyper_rustls::HttpsConnector;
+use regex::Regex;
+use serde_json;
+use reqwest;
 
 use crate::record::Record;
 use crate::times;
 
 const SINGLE_STAR_RECORDS_URL: &str = "https://singlestar.sm64rta.info/singlestar/";
+
+const RTA_RECORDS_SPREADSHEET_ID: &str = "1J20aivGnvLlAuyRIMMclIFUmrkHXUzgcDmYa31gdtCI";
+const RTA_RECORDS_SPREADSHEET_RANGE: &str = "'Best Time(Raw)'!B:K";
+
+#[derive(Debug)]
+pub enum FetchError {
+    Sheets(sheets4::Error),
+    Reqwest(reqwest::Error),
+    IO(std::io::Error)
+}
+
+impl From<sheets4::Error> for FetchError {
+    fn from(e: sheets4::Error) -> Self {
+        FetchError::Sheets(e)
+    }
+}
+
+impl From<reqwest::Error> for FetchError {
+    fn from(e: reqwest::Error) -> Self {
+        FetchError::Reqwest(e)
+    }
+}
+
+impl From<std::io::Error> for FetchError {
+    fn from(e: std::io::Error) -> Self {
+        FetchError::IO(e)
+    }
+}
+
+pub type Result<T> = std::result::Result<T, FetchError>;
 
 // The database stores secret stage course numbers as
 // found on the Ultimate Star Spreadsheet v2's "Raw Times"
@@ -91,15 +126,15 @@ fn adjust_course_num_for_database(record: &mut Record) {
     }
 }
 
-pub fn single_star_records() -> reqwest::Result<Vec<Record>> {
+pub fn single_star_records() -> Result<Vec<Record>> {
     // For testing purposes:
-    let html = fs::read_to_string("dev_resources/new_ss.html").unwrap();
+    let html = fs::read_to_string("dev_resources/new_ss.html")?;
     // let html = reqwest::blocking::get(SINGLE_STAR_RECORDS_URL)?.text()?;
 
     let cell_pattern = Regex::new(r#"<td( class="small")?>((<a href="(?<link>.+)">)|(<i class=.+"><span .+oon">)|(<img src="/img/flag/(?<region>us|jp|eu)\.png".+t">))?(?<text>[^<]*)"#).unwrap();
 
     let lines = html.lines();
-    let mut records: Vec<Record> = Vec::new();
+    let mut records = Vec::<Record>::new();
     let mut cur_record: Record = Record::default();
     // Keep track of which field we're on
     // when populating a Record struct.
@@ -161,6 +196,59 @@ pub fn single_star_records() -> reqwest::Result<Vec<Record>> {
     Ok(records)
 }
 
-pub fn rta_records() -> Vec<Record> {
-    todo!("fetch::rta_records")
+async fn get_sheets_hub() -> Result<Sheets<HttpsConnector<HttpConnector>>> {
+    let creds_json = fs::read_to_string("auth/credentials.json")?;
+    let secret: yup_oauth2::ApplicationSecret =
+        match serde_json::from_str::<yup_oauth2::ConsoleApplicationSecret>(&creds_json) {
+            Ok(s) => s.installed.unwrap(),
+            Err(err) => panic!("Encountered error parsing ApplicationSecret: {}", err)
+        };
+
+    let auth = yup_oauth2::InstalledFlowAuthenticator::builder(
+        secret,
+        yup_oauth2::InstalledFlowReturnMethod::HTTPRedirect,
+    ).persist_tokens_to_disk("auth/token.json").build().await?;
+
+    let client = hyper_util::client::legacy::Client::builder(
+        hyper_util::rt::TokioExecutor::new()
+    )
+    .build(
+        hyper_rustls::HttpsConnectorBuilder::new()
+            .with_native_roots()
+            .unwrap()
+            .https_or_http()
+            .enable_http1()
+            .build()
+    );
+
+    Ok(Sheets::new(client, auth))
+}
+
+pub async fn rta_records() -> Result<Vec<Record>> {
+    let hub = get_sheets_hub().await?;
+    let values = hub
+        .spreadsheets()
+        .values_get(RTA_RECORDS_SPREADSHEET_ID, RTA_RECORDS_SPREADSHEET_RANGE)
+        .add_scope(sheets4::api::Scope::SpreadsheetReadonly)
+        .value_render_option("FORMULA")
+        .doit()
+        .await?;
+
+    let mut records = Vec::<Record>::new();
+    for row in &values.1.values.unwrap() {
+        let b: Vec<_> = row
+            .iter()
+            .map(|val| val
+                .to_string()
+                .replace('"', "")
+                .replace("\\", ""))
+            .collect();
+
+        let record = (&b).try_into();
+        if record.is_ok() {
+            records.push(record.unwrap());
+        }
+    }
+
+    Ok(records)
 }
