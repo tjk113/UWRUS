@@ -1,26 +1,11 @@
 use std::cmp;
 
-use rusqlite::{Connection, Result, params};
+use rusqlite::{Connection, Statement, Result, params};
 
 use crate::record::Record;
 use crate::times;
 
-pub const PATH: &str = "./records.db";
-
-const SINGLE_STAR_RECORDS_UPDATE_QUERY: &str =
-    "UPDATE ss_records
-    SET Time = ?3,
-        VideoLink = ?4
-    WHERE
-        Course = ?1 AND Star = ?2;";
-
-// TODO
-const RTA_RECORDS_UPDATE_QUERY: &str =
-    "UPDATE rta_records
-    SET Time = ?3,
-        VideoLink = ?4
-    WHERE
-        Course = ?1 AND Star = ?2;";
+pub const PATH: &str = "records.db";
 
 #[derive(Debug, PartialEq)]
 pub enum RecordsTable {
@@ -40,12 +25,16 @@ impl RecordsTable {
 pub fn update_records(con: &mut Connection, new_records: &Vec<Record>, table: RecordsTable) -> Result<()> {
     let transaction = con.transaction()?;
 
-    let query = match table {
-        RecordsTable::SingleStar => SINGLE_STAR_RECORDS_UPDATE_QUERY,
-        RecordsTable::RTA => RTA_RECORDS_UPDATE_QUERY
-    };
+    let query = format!(
+        "UPDATE {}
+        SET Time = ?3,
+            VideoLink = ?4
+        WHERE
+            Course = ?1 AND Star = ?2;",
+        table.to_table_name()
+    );
 
-    let mut statement = transaction.prepare(query)?;
+    let mut statement = transaction.prepare(&query)?;
 
     for record in new_records {
         let params = match table {
@@ -53,9 +42,12 @@ pub fn update_records(con: &mut Connection, new_records: &Vec<Record>, table: Re
                 record.course, record.star,
                 record.time, record.video_link
             ],
-            RecordsTable::RTA => params![]
+            RecordsTable::RTA => params![
+                record.course, record.star,
+                record.time, record.video_link,
+                record.with_100_coins
+            ]
         };
-
         let _ = statement.execute(params)?;
     }
 
@@ -84,11 +76,18 @@ pub fn get_new_records(con: &mut Connection, fetched_records: &Vec<Record>, tabl
         let time = row.get_ref_unwrap(2).as_str()?;
         let video_link = row.get_ref_unwrap(3).as_str()?;
 
-        // TODO: rta records will need to
-        // check the `with_100_coins` field.
         let fetched_record = fetched_records[fetched_records.iter().position(
             |x| (x.course as i64) == course
                 && (x.star as i64) == star
+                && match table {
+                       // For RTA records, we also need to match the record
+                       // to its route with the 100 coins star if it has one.
+                       RecordsTable::RTA => {
+                           let with_100_coins = row.get_ref_unwrap(4).as_i64().unwrap();
+                           (x.with_100_coins as i64) == with_100_coins
+                       },
+                       _ => true
+                }
         ).unwrap()].clone();
 
         let should_update = match times::compare(fetched_record.time.as_str(), time).unwrap() {

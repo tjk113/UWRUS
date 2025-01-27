@@ -67,7 +67,7 @@ impl TryFrom<&Vec<String>> for Record {
         }
 
         let split: Vec<_> = v[time_index].split(',').collect();
-        (record.video_link, record.time) = 
+        (record.video_link, record.time) =
             (split[0].trim_start_matches("=HYPERLINK(").to_string(),
              split[1].trim_end_matches(')').to_string());
 

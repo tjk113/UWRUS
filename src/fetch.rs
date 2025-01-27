@@ -14,7 +14,7 @@ use crate::times;
 const SINGLE_STAR_RECORDS_URL: &str = "https://singlestar.sm64rta.info/singlestar/";
 
 const RTA_RECORDS_SPREADSHEET_ID: &str = "1J20aivGnvLlAuyRIMMclIFUmrkHXUzgcDmYa31gdtCI";
-const RTA_RECORDS_SPREADSHEET_RANGE: &str = "'Best Time(Raw)'!B:K";
+const RTA_RECORDS_SPREADSHEET_RANGE: &str = "'Best Time(Raw)'!B4:K";
 
 #[derive(Debug)]
 pub enum FetchError {
@@ -224,6 +224,25 @@ async fn get_sheets_hub() -> Result<Sheets<HttpsConnector<HttpConnector>>> {
     Ok(Sheets::new(client, auth))
 }
 
+// This predicate for pushing records means that we
+// will only take the fastest time for each star
+// across all strategies.
+fn should_push(fastest: &Option<Record>, cur: &Record) -> bool {
+    if let Some(fastest) = fastest {
+        times::compare(&cur.time, &fastest.time)
+            .unwrap().is_lt()
+    }
+    else {
+        true
+    }
+}
+
+fn is_same_star(a: &Record, b: &Record) -> bool {
+    a.star == b.star
+    && a.course == b.course
+    && a.with_100_coins == b.with_100_coins
+}
+
 pub async fn rta_records() -> Result<Vec<Record>> {
     let hub = get_sheets_hub().await?;
     let values = hub
@@ -235,6 +254,8 @@ pub async fn rta_records() -> Result<Vec<Record>> {
         .await?;
 
     let mut records = Vec::<Record>::new();
+    // The fastest time for the current star.
+    let mut fastest_record: Option<Record> = None;
     for row in &values.1.values.unwrap() {
         let b: Vec<_> = row
             .iter()
@@ -245,8 +266,22 @@ pub async fn rta_records() -> Result<Vec<Record>> {
             .collect();
 
         let record = (&b).try_into();
-        if record.is_ok() {
-            records.push(record.unwrap());
+        match record {
+            Ok(record) => {
+                if let Some(fastest) = &fastest_record {
+                    if !is_same_star(&fastest, &record) {
+                        fastest_record = None;
+                    }
+                }
+                if should_push(&fastest_record, &record) {
+                    if let Some(_) = &fastest_record {
+                        let _ = records.pop().unwrap();
+                    }
+                    fastest_record = Some(record.clone());
+                    records.push(record);
+                }
+            },
+            _ => {}
         }
     }
 

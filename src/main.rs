@@ -1,4 +1,5 @@
 #![feature(core_intrinsics)]
+#![feature(vec_pop_if)]
 
 /// Data structures and functions for storing and modifying records.
 mod record;
@@ -11,7 +12,7 @@ mod times;
 /// Functions for editing page text to be uploaded to the wiki.
 mod text;
 
-use std::{fs, str};
+use std::{fs, io::Write, io::BufWriter, str};
 
 use rusqlite::{Connection, Result};
 // use mediawiki;
@@ -29,7 +30,7 @@ fn main() -> Result<()> {
 
     // TODO: merge disparate Result types
     // into a type that main can return
-    // let mut con = Connection::open(database::PATH)?;
+    let mut con = Connection::open(database::PATH)?;
     // let ss_records = fetch::single_star_records().unwrap();
     // let new_ss_records = database::get_new_records(&mut con, &ss_records, database::RecordsTable::SingleStar).unwrap();
     // database::update_records(&mut con, &new_ss_records, database::RecordsTable::SingleStar)?;
@@ -76,6 +77,7 @@ fn main() -> Result<()> {
             // return Err();
         }
     };
+    // database::update_records(&mut con, &rta_records, database::RecordsTable::RTA)?;
 
     for record in rta_records {
         println!("{:#?}", record);
