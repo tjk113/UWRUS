@@ -1,0 +1,44 @@
+{
+    "batchcomplete": true,
+    "curtimestamp": "2025-01-29T18:40:17Z",
+    "query": {
+        "pages": [
+            {
+                "ns": 0,
+                "pageid": 1861,
+                "revisions": [
+                    {
+                        "slots": {
+                            "main": {
+                                "content": "{{speedrun_infobox_bowser_level\n|title= Bowser in the Sky\n|image= BitS.png\n|rta_record=[https://twitter.com/cjrokokomero/status/1724152663757971598 35.66 (Course)] / [https://www.youtube.com/watch?v=A9jesv4I_Ak 1:02.66 (with Red Coins)]\n|ss_record=[https://www.youtube.com/watch?v=_IRDng0CHxA 33.83 (Course)] / [https://www.youtube.com/watch?v=sXve_P292jM 58.99 (with Red Coins)]\n|throws_record=[https://www.youtube.com/watch?v=8PvdiGtw99s 37.07]\n}}\n:''For the final battle with Bowser at the end of this stage, see the [[RTA Guide/Bowser Battles#Bowser in the Sky|Bowser Battles]] page.''\n'''Bowser in the Sky''' is located at the top of the endless staircase behind the 70 star door. 70 stars are needed to access it without the use of a BLJ.\n\n== Reds ==\n=== Beginner ===\n{{#ev:youtube|HpXndR_Ye1M}}\n<li style=\"display: inline-block; vertical-align: top;\">\n[[File:Bits reds alt ending.mp4|thumb| Alternate ending movement ([https://youtu.be/drNed4QiIhU full video w/ inputs])|class=autoplay]]\n</li>\n=== Advanced ===\n{{#ev:youtube|IajSeNb0Fys}}\n====Invisible Axle Position====\nThe hitboxes of the elevators' axles do not line up with their visual models; you may encounter issues with them if you're going for early cycle or miss four cycles. These clips show the hitboxes' actual locations.\n{{#ev:youtube|HuTwKkhpGoQ}}\n{{#ev:youtube|9b05ZhSsKdQ}}\n\n== No Reds ==\n===Beginner (Pole)===\n{{#ev:youtube|bFEkarSrobE}}\n===Intermediate (Standing Left Side) ===\n{{#ev:youtube|3cTtu0fiMzA}}\n<li style=\"display: inline-block; vertical-align: top;\">\n[[File:Bits standing tjwk punch.mp4|thumb|Punch, jump while the stick is neutral, hold up after the double jump, switch to up-left after the triple jump, then rotate the stick counterclockwise to the right notch after the wallkick.|class=autoplay]]\n</li>\n===Advanced (Moving Left Side)===\n{{#ev:youtube|RIk1E7yLl8I}}\n<li style=\"display: inline-block; vertical-align: top;\">\n[[File:Bits moving left camera setup.mp4|thumb|'''Alternate camera setup''': Press C-Right twice during the long jump, then R + C-Down. After landing, press C-Right twice, then do a single jump and hit R again at the edge of the platform.|class=autoplay]]\n</li>\n===Expert (Moving Right Side)===\n{{#ev:youtube|ocKpLZpW_FE}}\n===Manamo Cycle===\n{{#ev:youtube|ztXWYtEn80Y}}\n<li style=\"display: inline-block; vertical-align: top;\">\n[[File:Bits manamo ljwk.mp4|thumb|Alternate long jump wallkick strat ([https://youtu.be/3vBZgb69O_s full video w/ inputs])|class=autoplay]]\n</li>\n<li style=\"display: inline-block; vertical-align: top;\">\n[[File:Bits ultimate ending.mp4|thumb| Faster \"Ultimate\" ending ([https://youtu.be/Yw2PqNnln5Q full video w/ inputs])|class=autoplay]]\n</li>\n===\"TAS\" LJ===\nThis movement is one elevator cycle faster than Manamo cycle.\n====Tutorial====\n{{#ev:youtube|fmJCWHs36P4}}\n====Comparison====\n{{#ev:youtube|sHNOa79i-kI}}\n\n\n{{RTA Guide Nav}}",
+                                "contentformat": "text/x-wiki",
+                                "contentmodel": "wikitext"
+                            }
+                        },
+                        "timestamp": "2025-01-17T22:02:03Z"
+                    }
+                ],
+                "title": "RTA Guide/Bowser in the Sky"
+            },
+            {
+                "ns": 0,
+                "pageid": 3391,
+                "revisions": [
+                    {
+                        "slots": {
+                            "main": {
+                                "content": "{{speedrun_infobox\n|title= CCM 100 Coins\n|image= CCM.png\n|rta_record=[https://www.youtube.com/watch?v=38RTOt5sPs0 1:08.20 (with Slip Slidin' Away)] / [https://youtu.be/tN1G8XJ9rZQ 1:16.40 (with Big Penguin Race)]\n|ss_record=[https://www.youtube.com/watch?v=XlKThd9-3ZU 53.26]\n}}\n== With Big Penguin Race ==\nThere are '''77 coins''' inside the slide.\n==== Tips ====\n* Grabbing the first red:\n** The easiest and safest movement is to double jump kick near the top of the tree. Kicking while in the air prevents Mario from grabbing the tree. See the \"Intermediate\" video below as an example.\n** For the double jump dive into the first red coin, it's highly recommended you copy the camera inputs. At the start of the stage, c-right followed by Mario Cam + c-down. Make sure the Mario cam + c-down <u>is input before Mario touches the ground</u> to avoid grabbing the tree. Walk a few frames before the kick so that Mario is closer to his peak double jump height when you dive at the coin. See the \"Advanced\" video below as an example\n=== Beginner/Intermediate ===\nOnce you are in the slide, the strats are the same as [[#Advanced | Advanced]].\n<youtube>5KnwkLtrSiU</youtube>\n=== Advanced ===\n<youtube>1INOI_SaY6M</youtube>\n=== Atmpas Special Route ===\n{{#ev:youtube|T-MiCzgLxjQ}}\n==== Explanation Video ====\n{{#ev:youtube|Lu_sYYOVnzc}}\n=== Backup If You Miss Coins On Slide ===\n{{#ev:youtube|lhSfL82KlxA}}\n== With Slip Slidin' Away ==\nThere are '''77 coins''' inside the slide. \n=== Standard ===\n{{#ev:youtube|LBUdMQdrq94}}\n\n=== Tip ===\n* '''First red coin''': This coin is a little tough to grab. As a beginner, the easiest movement is to double jump kick near the top of the tree. Kicking while in the air prevents Mario from grabbing the pole until he lands. This makes it easy to strafe in the air and ensure you grab the coin. For the advanced movement (buffer kick → double jump → dive) to grab the coin, delay the buffered kick slightly so that Mario is closer to his peak double-jump height when you dive at the coin. This helps prevent grabbing the tree out of the dive.\n\n=== Expert ===\n{{#ev:youtube|z7n0M980P_s}}\n== Chimney TJ Dive Tutorial ==\n{{#ev:youtube|q0nzjuyuvIA}}\n{{RTA Guide Nav}}",
+                                "contentformat": "text/x-wiki"
+                            }
+                        },
+                        "timestamp": "2024-01-24T23:39:21Z"
+                    }
+                ],
+                "title": "RTA Guide/CCM 100 Coins"
+            }
+        ],
+        "tokens": {
+            "csrftoken": "+\\"
+        }
+    }
+}
