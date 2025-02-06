@@ -1,3 +1,5 @@
+use crate::wiki::Session;
+
 #[derive(Debug, Clone, Default)]
 pub struct Record {
     pub course: u8,
@@ -72,5 +74,49 @@ impl TryFrom<&Vec<String>> for Record {
              split[1].trim_end_matches(')').to_string());
 
         Ok(record)
+    }
+}
+
+#[derive(Debug)]
+pub struct RecordData {
+    pub records: Vec<Record>,
+    pub page_text: String
+}
+
+impl RecordData {
+    pub fn from(records: &[Record], page_text: String) -> Self {
+        Self {records: records.to_vec(), page_text}
+    }
+
+    /// Converts RTA and single star records into a vector of `RecordData`
+    pub fn from_to_vec(session: &mut Session, new_rta_records: Vec<Record>,
+                       new_ss_records: Vec<Record>) -> Vec<RecordData> {
+        let new_records = [new_rta_records, new_ss_records].concat();
+        let mut unique_stars = new_records.clone();
+        // TODO: Does this actually deduplicate properly?
+        unique_stars.dedup_by_key(|record| record.page_name.clone());
+        println!("{:?}", new_records);
+
+        let mut records_data = Vec::new();
+
+        let page_texts = session.get_page_texts(
+            &unique_stars
+            .iter()
+            .map(|record| record.page_name.clone())
+            .collect::<Vec<_>>()
+        );
+
+        for star in unique_stars {
+            let records = new_records
+                .iter()
+                .filter(|record| record.page_name == star.page_name)
+                .cloned()
+                .collect::<Vec<_>>();
+            records_data.push(
+                RecordData::from(&records, page_texts[&star.page_name].to_owned())
+            );
+        }
+
+        records_data
     }
 }
